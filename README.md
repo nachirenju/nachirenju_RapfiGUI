@@ -46,3 +46,13 @@ npm run dev
 ```bash
 npm run build
 ```
+
+---
+
+## ライセンス
+
+本プロジェクトは **GNU General Public License v3.0 (GPL-3.0)** に基づいてライセンスされています。
+
+* **著作権者**: Copyright (c) 2026 nachirenju
+* **ライセンス詳細**: [LICENSE](./LICENSE)
+
