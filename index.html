@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <script>
+        (() => {
+            const basePath = new URL("%BASE_URL%", window.location.origin).pathname.replace(/\/$/, "");
+            if (basePath && window.location.pathname === basePath) {
+                window.location.replace(`${basePath}/${window.location.search}${window.location.hash}`);
+            }
+        })();
+    </script>
+    <script src="%BASE_URL%coi-serviceworker.js" vite-ignore></script>
+
+    <script>
+        window.DEBUG_MODE = false;
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        console.log = function(...args) { if (window.DEBUG_MODE) originalLog.apply(console, args); };
+        console.warn = function(...args) { if (window.DEBUG_MODE) originalWarn.apply(console, args); };
+        console.error = function(...args) { if (window.DEBUG_MODE) originalError.apply(console, args); };
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapfi GUI</title>
+    <script src="%BASE_URL%preload_shim.js" vite-ignore></script>
+    <script type="module" src="/src/backend.js"></script>
+    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@latest"></script>
+    <script crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+    // --- 言語設定の読み込みと lang.js の動的読み込み ---
+    const currentLang = localStorage.getItem('rapfi_lang') || 'ja';
+    
+    // 'ja'（日本語）以外が選択されている場合、同期的にlang.jsを読み込む
+    if (currentLang !== 'ja') {
+        document.write('<script src="%BASE_URL%lang.js"><\/script>');
+    }
+    
+    function changeLanguage(lang) {
+        localStorage.setItem('rapfi_lang', lang);
+        location.reload();
+    }
+
+    // ページロード時にセレクトボックスの状態を復元する
+    window.addEventListener('DOMContentLoaded', () => {
+        const langSelect = document.getElementById('languageSelect');
+        if (langSelect) {
+            langSelect.value = currentLang;
+        }
+    });
+</script>
+    <style>
+/* (スタイルシートは変更なしのため省略。既存のまま使用してください) */
+body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex; flex-direction: column; align-items: center;
+            margin: 0; padding: 20px; color: #333;
+        }
+        h1 { margin-bottom: 20px; }
+        
+        .container { 
+            display: flex; 
+            flex-direction: row; 
+            justify-content: center; 
+            align-items: flex-start; 
+            gap: 20px; 
+            flex-wrap: wrap; 
+            width: 100%; 
+            max-width: 1200px;
+        }
+
+        .side_panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px; 
+            width: 320px; 
+            flex-shrink: 0;
+        }
+
+        .graph_panel { width: 150%; display: flex; flex-direction: column; gap: 10px; }
+        .control_panel { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+
+        .board_panel { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 10px; 
+            position: relative; 
+            width: 540px;
+            max-width: 100%;
+        }
+        
+        .board-wrapper { position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        
+        #renjuBoard {
+            display: block;
+            background-color: #F9EBCF;
+            cursor: default;
+            touch-action: none;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+        }
+     
+        .nav-buttons {
+            display: flex; flex-direction: column; justify-content: center; gap: 4px;
+            background: #e0e0e0; padding: 5px; border-top: 1px solid #ccc;
+            align-items: center;
+        }
+        .nav-row { display: flex; justify-content: center; align-items: center; gap: 5px; flex-wrap: wrap; width: 100%; }
+
+        .nav-btn {
+            width: 50px; padding: 4px 0; margin: 0;
+            font-weight: bold; font-size: 14px;
+            color: #000;
+            background: #fff; border: 1px solid #aaa; border-radius: 4px; cursor: pointer;
+            line-height: 1.2;
+        }
+        .nav-btn:hover { background: #f0f0f0; }
+        
+        .nav-btn.load-btn { background: #ff9800; color: white; border-color: #e65100; font-size: 12px; }
+        .nav-btn.load-btn:hover { background: #f57c00; }
+
+        .nav-btn.toggle-btn {
+            background: #28a745; 
+            color: white; 
+            border-color: #1e7e34;
+            font-size: 12px; width: auto; padding: 4px 8px;
+        }
+        .nav-btn.toggle-btn:hover { background: #218838; }
+
+        .nav-btn.portal-btn {
+            background: #17a2b8;
+            color: white;
+            border-color: #117a8b;
+            font-size: 12px;
+            width: auto;
+            padding: 4px 8px;
+        }
+        .nav-btn.portal-btn:hover { background: #138496; }
+
+        .nav-btn.reset { 
+            background: #6c757d; 
+            color: white; 
+            border-color: #545b62; 
+            font-size: 12px; width: auto; padding: 4px 8px; 
+        }
+        .nav-btn:disabled {
+            background-color: #ccc !important;
+            color: #888 !important;
+            border-color: #bbb !important;
+            cursor: not-allowed;
+        }
+        .nav-btn.reset:hover { background: #5a6268; }
+        .nav-btn.action-btn { width: auto; min-width: 46px; padding: 5px 8px; font-size: 12px; }
+        .nav-btn.icon-btn { min-width: 34px; width: 34px; font-size: 18px; line-height: 1; padding: 4px 0; }
+        .nav-btn.start-action { background:#007bff; color:white; border-color:#0069d9; }
+        .nav-btn.research-action { background:#008000; color:white; border-color:#006b00; }
+        .nav-btn.pv-action { background:#198754; color:white; border-color:#146c43; }
+        .nav-btn.analyze-action { background:#6610f2; color:white; border-color:#520dc2; }
+        .nav-btn.takeback-action { background:#fd7e14; color:white; border-color:#dc6502; }
+        .nav-btn.finish-action { background:#dc3545; color:white; border-color:#bd2130; }
+        .nav-btn.settings-action { background:#17a2b8; color:white; border-color:#117a8b; }
+
+        .controls { 
+            padding: 10px;
+            background: white; border-radius: 8px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;
+        }
+        .time-settings-panel {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .time-settings-panel .row:last-child { margin-bottom: 0; }
+        .color-settings-panel {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .color-settings-panel .row { margin-bottom: 0; }
+        .row { margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        label { font-weight: bold; font-size: 13px; }
+        input[type=number] { width: 50px; padding: 3px; border: 1px solid #ccc; border-radius: 4px; text-align: right; font-size: 13px;}
+        select { padding: 3px; width: 110px; border-radius: 4px; border: 1px solid #ccc; font-size: 13px;}
+        
+        button.main-btn { 
+            width: 100%; 
+            padding: 0px 10px;
+            margin-top: 5px; cursor: pointer; 
+            background: #007bff; color: white; border: none; border-radius: 4px; 
+            font-weight: bold; font-size: 13px; 
+            transition: background 0.2s;
+        }
+        button.main-btn:hover { background: #0056b3; }
+        button.main-btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        button.analyze-btn { background: #6610f2; }
+        button.analyze-btn:hover { background: #520dc2; }
+
+        button.toggle-btn { background: #28a745; }
+        button.takeback { background: #fd7e14; }
+        button.takeback:hover { background: #dc6502; }
+        button.finish { background: #dc3545; margin-top: 10px; }
+        button.reset { background: #6c757d; }
+
+        .progress-wrapper { display: none; width: 100%; margin-top: 5px; text-align: center; }
+        progress { width: 100%; height: 15px; }
+
+        .timer-container {
+            display: flex; justify-content: space-between; gap: 8px;
+            margin-top: 3px; padding-top: 1px; border-top: 1px solid #eee;
+        }
+        .board-timer-container {
+            width: min(540px, 100%);
+            margin: 0 0 4px;
+            padding: 0;
+            border: 0;
+        }
+        .timer-box {
+            flex: 1; text-align: center; padding: 4px;
+            background: #f8f9fa; 
+            border-radius: 4px; border: 1px solid #ddd;
+        }
+        .board-timer-container .timer-box {
+            flex: 0 0 auto;
+            min-width: 68px;
+            padding: 2px 6px;
+            background: rgba(255,255,255,0.94);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+            backdrop-filter: blur(2px);
+        }
+        .timer-box.active { background-color: #fff9c4; border-color: #fbc02d; border-width: 2px; }
+        .timer-label { font-size: 11px; color: #666; margin-bottom: 0px; }
+        .timer-val { font-family: monospace; font-size: 16px; font-weight: bold; line-height: 1.2; }
+        .board-timer-container .timer-label { font-size: 10px; line-height: 1; }
+        .board-timer-container .timer-val { font-size: 15px; }
+        .t-player { color: #007bff; }
+        .t-rapfi { color: #d00; }
+        
+        #status { font-weight: bold; font-size: 14px; margin-top: 5px; text-align: center; min-height: 1.2em; }
+        .forbidden-msg { color: #d00; font-weight: bold; }
+        
+        #graph-container {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 380px;
+            height: 300px;
+            min-width: 260px;
+            min-height: 200px;
+
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #888;
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 2000;
+            display: none; 
+        }
+
+        #graph-header {
+            height: 24px;
+            background: #007bff;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-left: 10px;
+            padding-right: 5px;
+            cursor: move;
+            touch-action: none;
+            user-select: none;
+            width: 100%;
+            box-sizing: border-box; 
+            border-top-left-radius: 3px;
+            border-top-right-radius: 3px;
+        }
+
+        .graph-close-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+        .graph-close-btn:hover {
+            color: #ffcccc;
+        }
+
+        .chart-wrapper {
+            position: absolute;
+            top: 24px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            overflow: hidden;
+            padding: 5px;
+        }
+
+        #evalChart {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+
+        .g-resizer {
+            position: absolute;
+            z-index: 2010;
+        }
+        .g-resizer-t {
+            top: -5px;
+            left: 0;
+            width: 100%;
+            height: 10px;
+            cursor: n-resize;
+        }
+        .g-resizer-r {
+            top: 0;
+            right: -5px;
+            width: 10px;
+            height: 100%;
+            cursor: e-resize;
+        }
+        .g-resizer-tr {
+            top: -5px;
+            right: -5px;
+            width: 15px;
+            height: 15px;
+            cursor: ne-resize;
+            z-index: 2020;
+        }
+
+        #stats-container {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            width: 320px;
+            height: 450px;
+            min-width: 260px;
+            min-height: 150px;
+            background: white;
+            border: 1px solid #888;
+            border-radius: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            position: fixed; 
+            resize: none;
+            overflow: hidden;
+            z-index: 2000;
+            display: none;
+        }
+
+        .resizer {
+            position: absolute;
+            z-index: 2010;
+        }
+        .resizer-l {
+            top: 0; left: 0; width: 8px; height: 100%; cursor: w-resize;
+        }
+        .resizer-t {
+            top: 0; left: 0; height: 8px; width: 100%; cursor: n-resize;
+        }
+        .resizer-tl {
+            top: 0; left: 0; width: 15px; height: 15px; cursor: nw-resize; z-index: 2020;
+        }
+        .resizer-b {
+            bottom: 0; left: 0; height: 8px; width: 100%; cursor: s-resize;
+        }
+
+        #stats-window-header {
+            height: 30px;
+            width: 100%;
+            background: #007bff;
+            color: white;
+            box-sizing: border-box;
+            padding: 0 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: move;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #stats-content-area {
+            position: absolute;
+            top: 30px; 
+            left: 0; right: 0; bottom: 0;
+            overflow-y: auto; 
+            padding: 5px;
+            padding-bottom: 20px; 
+            background: #fff;
+        }
+        .window-controls { display: flex; gap: 5px; }
+        .win-btn {
+            background: transparent; border: none; color: white;
+            font-weight: bold; cursor: pointer; padding: 0 5px;
+        }
+        .win-btn:hover { background-color: rgba(255,255,255,0.3); border-radius: 3px; }
+        .win-btn.close:hover { background-color: #dc3545; }
+        .summary-table, .detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .detail-table th { position: sticky; top: 0; background: #eee; z-index: 1; }
+
+        .summary-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 10px; }
+        .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 4px; text-align: center; }
+        .summary-table th { background-color: #f2f2f2; font-weight: bold; }
+
+        .detail-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .detail-table th, .detail-table td { border-bottom: 1px solid #eee; padding: 4px 2px; text-align: left; }
+        .detail-table th { background-color: #f9f9f9; font-weight: bold; border-bottom: 2px solid #ddd; }
+        .detail-table tr:hover { background-color: #f0f8ff; cursor: pointer; }
+        
+        .move-num { font-weight: bold; color: #666; width: 25px; }
+        .move-pos { font-family: monospace; font-weight: bold; width: 35px; }
+        .eval-val { width: 45px; text-align: right; }
+        .ai-rec { color: #888; font-size: 10px; }
+        
+        .mark-best { color: #28a745; font-weight: bold; }
+        .mark-sec { color: #17a2b8; }
+        .mark-que { color: #ff9800; font-weight: bold; }
+        .mark-bad { color: #dc3545; font-weight: bold; }
+        .mark-lost { color: white; background-color: #dc3545; padding: 1px 4px; border-radius: 3px; font-weight: bold; font-size: 10px; }
+
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+            width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fff; margin: 5% auto; padding: 20px;
+            border: 1px solid #888; width: min(600px, calc(100vw - 24px)); border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+            max-height: calc(100dvh - 24px);
+            overflow-y: auto;
+        }
+        .modal-header { font-weight: bold; margin-bottom: 10px; font-size: 18px; }
+        .modal-list {
+            list-style: none; padding: 0; margin: 0;
+            max-height: 400px; overflow-y: auto; border: 1px solid #ccc;
+        }
+        .modal-list li {
+            padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 14px;
+            display: flex; justify-content: space-between; align-items: center; height: 110px;
+        }
+        .modal-list li:hover { background-color: #f0f8ff; }
+        .modal-list li.selected { background-color: #cce5ff; color: #004085; font-weight: bold; }
+        .list-text { flex: 1; padding-right: 10px; word-break: break-all; }
+}
+
+        .list-thumb { width: 100px; height: 100px; background-color: #F9EBCF; border: 1px solid #888; flex-shrink: 0; }
+        .modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-btn { width: auto; padding: 8px 16px; margin: 0; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white;}
+        .btn-open { background-color: #007bff; }
+        .btn-delete { background-color: #dc3545; }
+        .btn-cancel { background-color: #6c757d; }
+
+        #pvReviewModal .modal-content {
+            width: min(480px, calc(100vw - 24px)) !important;
+            max-height: calc(100dvh - 24px);
+            overflow-y: auto;
+            text-align: center;
+        }
+        #pvReviewModal .board-wrapper {
+            width: min(440px, 100%) !important;
+            max-width: 100%;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+        #pvReviewCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+        }
+        #pvReviewText {
+            min-height: 24px;
+            height: auto !important;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+        #pvReviewNotation {
+            width: min(400px, 100%) !important;
+            box-sizing: border-box;
+            overflow-wrap: anywhere;
+        }
+        #sgfText {
+            width: 100%;
+            height: 35px;
+            padding: 5px 10px;
+            margin-top: 5px;
+            border: 1px solid #28a745;
+            border-radius: 4px;
+            box-sizing: border-box; 
+            font-family: monospace;
+        }
+        
+        .nav-btn.quiz-btn { background: #9c27b0; color: white; border-color: #7b1fa2; font-size: 12px; }
+        .nav-btn.quiz-btn:hover { background: #7b1fa2; }
+        
+        .quiz-checkbox { width: 20px; height: 20px; margin-right: 10px; cursor: pointer; }
+        .quiz-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; color: white; margin-right: 5px; font-weight: bold; }
+        .bg-bad { background-color: #dc3545; }
+        .bg-que { background-color: #ff9800; }
+        .bg-miss { background-color: #e91e63; }
+        .bg-lose { background-color: #000; }
+
+        #quiz-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 48px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 10;
+        }
+        .quiz-correct { color: #28a745; opacity: 1 !important; }
+        .quiz-wrong { color: #dc3545; opacity: 1 !important; }
+
+        .tab-header {
+            display: flex;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 15px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            cursor: pointer;
+            background: #f1f1f1;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-weight: bold;
+            color: #666;
+            outline: none;
+        }
+        .tab-btn:hover { background: #ddd; }
+        .tab-btn.active {
+            background: #fff;
+            border-bottom: 3px solid #007bff;
+            color: #007bff;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        #portalExportModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #portalExportModal .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        /* 読み筋(PV)ウィンドウ用 */
+        #pv-container {
+            position: fixed; top: 100px; left: 20px; width: 420px; height: 350px;
+            background: rgba(255, 255, 255, 0.95); border: 1px solid #888; border-radius: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4); z-index: 2000; display: none;
+            flex-direction: column;
+        }
+        #pv-header {
+            height: 30px; background: #007bff; color: white; padding: 0 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: bold; font-size: 13px; cursor: move; touch-action: none; user-select: none;
+        }
+        #pv-content {
+            flex: 1; padding: 10px; overflow-y: auto; 
+            display: flex; flex-wrap: wrap; gap: 15px; align-content: flex-start;
+        }
+        .pv-board-box {
+            width: 180px; display: flex; flex-direction: column; align-items: center;
+            background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .pv-board-box canvas { width: 100%; aspect-ratio: 1/1; background-color: #F9EBCF; }
+        .pv-board-info {
+            width: 100%; font-size: 11px; text-align: center; margin-top: 5px; font-weight: bold;
+        }
+
+        :root {
+            --ui-bg: #eef1f5;
+            --ui-surface: #ffffff;
+            --ui-surface-soft: #f7f8fb;
+            --ui-border: #d7dce5;
+            --ui-text: #1f2937;
+            --ui-muted: #64748b;
+            --ui-primary: #2563eb;
+            --ui-primary-dark: #1d4ed8;
+            --ui-green: #16a34a;
+            --ui-orange: #f97316;
+            --ui-red: #dc2626;
+            --ui-purple: #7c3aed;
+            --ui-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+            --ui-shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.10);
+        }
+
+        body {
+            color: var(--ui-text);
+            background:
+                linear-gradient(180deg, #f8fafc 0%, var(--ui-bg) 100%);
+        }
+
+        h3 {
+            color: var(--ui-text);
+            letter-spacing: 0;
+        }
+
+        .board-wrapper {
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            border-radius: 8px;
+            box-shadow: var(--ui-shadow);
+            background: #f5dfad;
+        }
+
+        .nav-buttons {
+            background: rgba(248, 250, 252, 0.96);
+            border-top: 1px solid var(--ui-border);
+            padding: 7px;
+            gap: 6px;
+        }
+
+        .nav-row { gap: 6px; }
+
+        .nav-btn,
+        button.main-btn,
+        .modal-btn,
+        .tab-btn {
+            border-radius: 7px;
+            border: 1px solid var(--ui-border);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+            transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+        }
+
+        .nav-btn {
+            color: var(--ui-text);
+            background: linear-gradient(180deg, #fff 0%, #f3f6fb 100%);
+            border-color: #cbd5e1;
+        }
+
+        .nav-btn:hover,
+        .tab-btn:hover {
+            background: #eef4ff;
+            border-color: #93b4ef;
+            box-shadow: var(--ui-shadow-sm);
+        }
+
+        .nav-btn:active,
+        .modal-btn:active {
+            transform: translateY(1px);
+        }
+
+        .nav-btn.start-action,
+        .btn-open,
+        button.main-btn {
+            background: linear-gradient(180deg, #3b82f6 0%, var(--ui-primary) 100%);
+            border-color: var(--ui-primary-dark);
+            color: #fff;
+        }
+        .nav-btn.research-action,
+        .nav-btn.pv-action,
+        button.toggle-btn {
+            background: linear-gradient(180deg, #22c55e 0%, var(--ui-green) 100%);
+            border-color: #15803d;
+            color: #fff;
+        }
+        .nav-btn.analyze-action,
+        button.analyze-btn {
+            background: linear-gradient(180deg, #8b5cf6 0%, var(--ui-purple) 100%);
+            border-color: #6d28d9;
+            color: #fff;
+        }
+        .nav-btn.takeback-action {
+            background: linear-gradient(180deg, #fb923c 0%, var(--ui-orange) 100%);
+            border-color: #ea580c;
+            color: #fff;
+        }
+        .nav-btn.finish-action,
+        .btn-delete {
+            background: linear-gradient(180deg, #ef4444 0%, var(--ui-red) 100%);
+            border-color: #b91c1c;
+            color: #fff;
+        }
+        .nav-btn.settings-action,
+        .nav-btn.portal-btn {
+            background: linear-gradient(180deg, #06b6d4 0%, #0891b2 100%);
+            border-color: #0e7490;
+            color: #fff;
+        }
+        .nav-btn.reset,
+        .btn-cancel {
+            background: linear-gradient(180deg, #64748b 0%, #475569 100%);
+            border-color: #334155;
+            color: #fff;
+        }
+
+        .nav-btn.board-color-swatch {
+            background: var(--swatch-color) !important;
+            border-color: rgba(15, 23, 42, 0.35);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 1px 2px rgba(15, 23, 42, 0.12);
+        }
+
+        .nav-btn.board-color-swatch:hover {
+            background: var(--swatch-color) !important;
+            border-color: rgba(15, 23, 42, 0.65);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), var(--ui-shadow-sm);
+        }
+
+        .controls,
+        .time-settings-panel,
+        .color-settings-panel {
+            background: var(--ui-surface);
+            border: 1px solid var(--ui-border);
+            box-shadow: var(--ui-shadow-sm);
+        }
+
+        label,
+        .timer-label {
+            color: var(--ui-muted);
+        }
+
+        input[type=number],
+        select,
+        #sgfText {
+            color: var(--ui-text);
+            background: #fff;
+            border-color: #cbd5e1;
+            border-radius: 7px;
+            box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+        }
+
+        .board-timer-container {
+            justify-content: center;
+            gap: 28px;
+            margin-bottom: 8px;
+        }
+
+        .board-timer-container .timer-box {
+            min-width: 92px;
+            padding: 5px 12px;
+            border-radius: 8px;
+            border-color: rgba(148, 163, 184, 0.55);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: var(--ui-shadow-sm);
+        }
+
+        .timer-box.active {
+            background: #fff7d6;
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18), var(--ui-shadow-sm);
+        }
+
+        .board-timer-container .timer-label {
+            font-size: 11px;
+        }
+
+        .board-timer-container .timer-val {
+            font-size: 18px;
+            letter-spacing: 0;
+        }
+
+        #graph-container,
+        #stats-container,
+        #pv-container {
+            border: 1px solid rgba(148, 163, 184, 0.55);
+            border-radius: 8px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+            background: rgba(255, 255, 255, 0.97);
+            backdrop-filter: blur(8px);
+        }
+
+        #graph-header,
+        #stats-window-header,
+        #pv-header {
+            background: linear-gradient(180deg, #334155 0%, #1f2937 100%);
+            color: #f8fafc;
+            border-top-left-radius: 7px;
+            border-top-right-radius: 7px;
+        }
+
+        #stats-content-area,
+        #pv-content,
+        .chart-wrapper {
+            background: var(--ui-surface);
+        }
+
+        .summary-table th,
+        .detail-table th {
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        .summary-table th,
+        .summary-table td,
+        .detail-table th,
+        .detail-table td {
+            border-color: #e2e8f0;
+        }
+
+        .detail-table tr:hover,
+        .modal-list li:hover {
+            background-color: #eff6ff;
+        }
+
+        .pv-board-box {
+            border-color: var(--ui-border);
+            border-radius: 8px;
+            box-shadow: var(--ui-shadow-sm);
+            background: var(--ui-surface-soft);
+        }
+
+        .modal {
+            background-color: rgba(15, 23, 42, 0.48);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content,
+        #portalExportModal .modal-content {
+            border: 1px solid rgba(148, 163, 184, 0.55);
+            border-radius: 10px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+        }
+
+        .modal-header {
+            color: var(--ui-text);
+        }
+
+        .modal-list {
+            border-color: var(--ui-border);
+            border-radius: 8px;
+            overflow: hidden auto;
+        }
+
+        .modal-list li {
+            border-bottom-color: #e2e8f0;
+        }
+
+        .modal-list li.selected {
+            background-color: #dbeafe;
+            color: #1e3a8a;
+        }
+
+        @media (max-width: 700px) {
+            body { padding: 6px; }
+            h3 { margin: 4px 0 6px; font-size: 16px; }
+            #languageSelect { margin-bottom: 6px; }
+            .container { gap: 8px; }
+            .board_panel, .side_panel { width: 100%; }
+            .board_panel { gap: 6px; }
+            .board-wrapper { width: 100%; max-width: min(100vw - 12px, 540px); }
+            .nav-buttons { padding: 4px; gap: 4px; }
+            .nav-row { gap: 4px; }
+            .nav-btn { width: 38px; min-height: 30px; font-size: 13px; }
+            .nav-btn.action-btn { min-width: 40px; padding: 5px 6px; font-size: 11px; }
+            .nav-btn.icon-btn { min-width: 32px; width: 32px; font-size: 17px; }
+            .controls { padding: 8px; }
+            .row { gap: 8px; align-items: flex-start; }
+            .row > label { min-width: 96px; }
+            input[type=number] { min-height: 28px; }
+            select { min-height: 30px; }
+            #status { font-size: 13px; margin-top: 2px; }
+            .timer-container { gap: 4px; }
+            .board-timer-container { margin-bottom: 4px; }
+            .board-timer-container { justify-content: center; gap: 18px; }
+            .board-timer-container .timer-box { min-width: 74px; padding: 4px 9px; }
+            .board-timer-container .timer-label { font-size: 10px; }
+            .board-timer-container .timer-val { font-size: 16px; }
+            #graph-container, #pv-container, #stats-container {
+                width: min(92vw, 340px);
+                min-width: 240px;
+                max-width: calc(100vw - 12px);
+                left: 6px;
+                right: auto;
+            }
+            #graph-container { height: 220px; bottom: 10px; }
+            #pv-container { height: 260px; top: 72px; }
+            #stats-container { height: min(70dvh, 390px); top: 72px; }
+            .modal { padding: 0; }
+            .modal-content, #engineModal .modal-content, #portalExportModal .modal-content {
+                width: calc(100vw - 16px) !important;
+                max-width: calc(100vw - 16px);
+                margin: 8px auto;
+                padding: 12px;
+                max-height: calc(100dvh - 16px);
+            }
+            .modal-list { max-height: 52dvh; }
+            .modal-list li { height: auto; min-height: 80px; padding: 8px; }
+            .list-thumb { width: 72px; height: 72px; }
+            .modal-footer { position: sticky; bottom: -12px; background: #fff; padding-top: 8px; }
+            #pvReviewModal .modal-content {
+                width: calc(100vw - 16px) !important;
+                max-width: calc(100vw - 16px);
+                margin: 8px auto;
+                padding: 10px;
+            }
+            #pvReviewModal .modal-header {
+                font-size: 15px;
+                margin-bottom: 8px;
+            }
+            #pvReviewModal .board-wrapper {
+                width: min(calc(100vw - 40px), calc(100dvh - 250px), 440px) !important;
+                min-width: 240px;
+            }
+            #pvReviewText {
+                margin-top: 10px !important;
+                font-size: 13px !important;
+                min-height: 20px;
+            }
+            #pvReviewModal .modal-footer {
+                justify-content: center !important;
+                gap: 8px !important;
+                flex-wrap: wrap;
+            }
+            #pvReviewModal .modal-btn {
+                min-width: 44px;
+                min-height: 36px;
+                padding: 7px 10px;
+            }
+            #pvReviewNotation {
+                margin-top: 10px !important;
+                padding: 8px !important;
+                font-size: 13px !important;
+                max-height: 18dvh;
+                overflow-y: auto;
+            }
+            .tab-btn { padding: 8px 4px; font-size: 12px; }
+        }
+        /* デバッグモードスイッチ */
+        .debug-switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+        .debug-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .debug-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 20px;
+        }
+        .debug-slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        .debug-switch input:checked + .debug-slider {
+            background-color: #2196F3;
+        }
+        .debug-switch input:checked + .debug-slider:before {
+            transform: translateX(14px);
+        }
+    </style>
+</head>
+<body>
+    <h3>RapfiGUI</h3>
+    <select id="languageSelect" onchange="changeLanguage(this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 13px;">
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+            <option value="ko">한국어</option>
+            <option value="zh-CN">简体中文</option>
+            <option value="zh-TW">繁體中文</option>
+        </select>
+    
+    <div class="container">
+        <div class="board_panel">
+           <details id="evalRealtimePanel" style="width: 100%; margin-bottom: 5px; border: 1px solid #ccc; border-radius: 4px; background: #fff; box-sizing: border-box;">
+                <summary style="padding: 8px; cursor: pointer; background: #eef; font-weight: bold; font-size: 13px; user-select: none; outline: none; text-align: center; color: #445;">
+                    AI形勢判断を表示 (クリックで開閉)
+                </summary>
+                <div style="padding: 12px; text-align: center; background: #fcfcfc; border-top: 1px solid #eee;">
+                    <div style="margin-bottom: 8px;">
+                        <span style="font-size: 12px; color: #666;">評価値:</span>
+                        <span id="rtEvalScore" style="font-family: monospace; font-size: 20px; font-weight: bold; margin-left: 5px; min-width: 60px; display: inline-block;">--</span>
+                        
+                        <span style="margin: 0 15px; color: #ccc;">|</span>
+                        
+                        <span style="font-size: 12px; color: #666;">勝率:</span>
+                        <span id="rtWinRate" style="font-family: monospace; font-size: 20px; font-weight: bold; margin-left: 5px; min-width: 50px; display: inline-block;">--%</span>
+                    </div>
+                    
+                </div>
+            </details>
+            <div class="timer-container board-timer-container">
+                    <div id="playerTimerBox" class="timer-box">
+                        <div class="timer-label">あなた</div>
+                        <div id="playerTime" class="timer-val t-player">--:--</div>
+                    </div>
+                    <div id="rapfiTimerBox" class="timer-box">
+                        <div class="timer-label">Rapfi</div>
+                        <div id="rapfiTime" class="timer-val t-rapfi">--:--</div>
+                    </div>
+                </div>
+            <div class="board-wrapper">
+                <canvas id="renjuBoard" width="540" height="540"></canvas>
+                <div id="quiz-overlay"></div>
+                <div class="nav-buttons">
+                    <div class="nav-row nav-row-primary">
+                    <button class="nav-btn load-btn" style="display:none;" onclick="app.openLoadModal()">Load</button>
+                    
+                    
+                    <button class="nav-btn" style="display:none !important; background:#e91e63; color:white; width:70px; padding:3 10px; font-size:12px;" onclick="app.saveCurrentPositionAsQuiz()">クイズ保存</button>
+                    <button class="nav-btn quiz-btn" style="display:none;" onclick="app.openQuizModal()">Quiz</button>
+                    <button id="btnQuitQuiz" class="nav-btn" style="display:none; background:#6c757d; color:white; width:auto !important; padding:0 10px; border-color:#545b62;" onclick="app.quitQuizMode()">終了</button>
+                    <button class="nav-btn" onclick="app.firstMove()">|&lt;</button>
+                    <button class="nav-btn" onclick="app.prevMove()">&lt;</button> 
+                    <button class="nav-btn" onclick="app.nextMove()">&gt;</button>
+                    <button class="nav-btn" onclick="app.goToLast()">&gt;|</button>
+                    <button class="nav-btn toggle-btn" onclick="app.toggleNumbers()">①</button>
+                    <button id="btnReset" class="nav-btn reset" onclick="app.resetReview()">Reset</button>
+                    <button class="btn btn-secondary" onclick="app.exportRenjuPortalUrl()">Portal</button>
+                    </div>
+                    <div class="nav-row nav-row-actions">
+                        <button id="btnStart" class="nav-btn action-btn start-action" onclick="app.handleGameControl()" disabled>対局開始</button>
+                        <button id="btnResearch" class="nav-btn action-btn research-action" onclick="app.toggleResearchMode()" disabled>研究</button>
+                        <button class="nav-btn action-btn pv-action" onclick="app.togglePvWindow()">読み筋</button>
+                        <button class="nav-btn action-btn analyze-action analyze-btn" onclick="app.startAnalysis()" disabled>解析</button>
+                        <button id="btnTakeback" class="nav-btn action-btn takeback-action" onclick="app.takebackMove()" disabled>待った</button>
+                        <button class="nav-btn action-btn icon-btn settings-action" onclick="app.openEngineSettings()" aria-label="詳細設定" title="詳細設定">⚙</button>
+                    </div>
+                </div>
+            </div>
+            <div style="width: 100%; margin-top: 5px;">
+                <label style="font-size: 12px; font-weight: bold; color: #666;">棋譜 (編集可):</label>
+                <textarea id="notationDisplay" 
+                    style="width: 100%; height: 50px; font-family: monospace; font-size: 16px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; resize: none; background: #fff;"
+                    placeholder="例: h8i9..."></textarea>
+                <input type="text" class="status-bar" id="sgfText" placeholder="(;GM[1]SZ[15]...)" spellcheck="false">
+            </div>
+            <div style="width: 100%; margin-top: 10px;">
+                <label style="font-size: 12px; font-weight: bold; color: #007bff;">連珠ポータルURLから読込:</label>
+                <input type="text" id="portalUrlInput" 
+                    style="width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #007bff; box-sizing: border-box;"
+                    placeholder="https://v1.renjuportal.com/board/?mv=...">
+            </div>
+            <div style="font-size: 12px; color: #666;">※左クリックで着手 / 右クリックで待った</div>
+            
+            <details style="width: 100%; margin-top: 10px; border: 1px solid #ccc; border-radius: 4px; background: #fff; box-sizing: border-box;">
+                <summary style="padding: 8px; cursor: pointer; background: #eee; font-weight: bold; font-size: 12px; user-select: none; outline: none;">
+                    AI思考ログ (AI PV / Raw)
+                </summary>
+              <div id="aiLogContainer" style="
+                    height: 200px; 
+                    overflow-y: scroll; 
+                    padding: 5px; 
+                    font-family: 'Consolas', 'Monaco', monospace; 
+                    font-size: 11px; 
+                    white-space: pre-wrap; 
+                    word-break: break-all; 
+                    background-color: #1e1e1e; 
+                    color: #d4d4d4; 
+                    line-height: 1.4;">
+                </div>
+            </details>
+        </div>
+
+        <div class="side_panel">
+            
+            <div class="control_panel">
+                <div class="controls">
+                    <div id="timeSettingsPanel" class="time-settings-panel">
+                    <div class="row">
+                        <label>持ち時間ルール</label>
+                        <div>
+                            <select id="timeRuleMode" onchange="app.updateTimeRuleUi()">
+                                <option value="normal" selected>持ち時間＋加算</option>
+                                <option value="perMove">一手N秒</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="border-bottom: 1px dashed #ccc; margin-bottom: 5px; padding-bottom: 5px;">
+                        <label style="color: #007bff;">[ あなたの設定 ]</label>
+                        <div class="row time-normal-setting">
+                            <label>持ち時間</label><div><input type="number" id="playerTimeMin" value="10" min="0" style="width:45px;"> 分
+                                <input type="number" id="playerTimeSec" value="0" min="0" max="59" style="width:45px;"> 秒
+                            </div>
+                        </div>
+                        <div class="row time-normal-setting">
+                            <label>加算時間</label><div><input type="number" id="playerIncConfig" value="10" min="0"> 秒</div>
+                        </div>
+                        <div class="row time-per-move-setting" style="display:none;">
+                            <label>一手の時間</label><div><input type="number" id="playerPerMoveSec" value="10" min="1" style="width:60px;"> 秒</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 5px; padding-bottom: 5px;">
+                        <label style="color: #d00;">[ Rapfiの設定 ]</label>
+                        <div class="row time-normal-setting">
+                            <label>持ち時間</label><div><input type="number" id="aiTimeMin" value="1" min="0" style="width:45px;"> 分
+                                <input type="number" id="aiTimeSec" value="0" min="0" max="59" style="width:45px;"> 秒</div>
+                        </div>
+                        <div class="row time-normal-setting">
+                            <label>加算時間</label><div><input type="number" id="aiIncConfig" value="0" min="0"> 秒</div>
+                        </div>
+                        <div class="row time-per-move-setting" style="display:none;">
+                            <label>一手の時間</label><div><input type="number" id="aiPerMoveSec" value="10" min="1" style="width:60px;"> 秒</div>
+                        </div>
+                    </div>
+                    </div>
+                    <div id="colorSettingsPanel" class="color-settings-panel">
+                    <div class="row">
+                        <label>あなたの色</label>
+                        <select id="playerColor">
+                            <option value="1">黒 (先手)</option>
+                            <option value="2" selected>白 (後手)</option>
+                            <option value="0" style="color:black; font-weight:bold;">観戦 (Rapfi vs Rapfi)</option> 
+                        </select>
+                    </div>
+                    </div>
+                    <div class="row" style="justify-content: flex-start; gap: 10px;">
+                        <input type="checkbox" id="saveSettings" checked>
+                        <label for="saveSettings" style="font-weight: normal; font-size: 12px; cursor: pointer;">次回もこの設定を使用する</label>
+                    </div>
+
+                    <div class="row" style="justify-content: flex-start; gap: 10px; border-top: 1px dashed #ccc; padding-top: 8px; margin-top: 4px;">
+                        <label class="debug-switch">
+                            <input type="checkbox" id="debugModeToggle">
+                            <span class="debug-slider"></span>
+                        </label>
+                        <label for="debugModeToggle" style="font-weight: normal; font-size: 12px; cursor: pointer; color: #888;">🛠 デバッグモード</label>
+                    </div>
+
+                    <div id="status">対局準備中 (編集モード)</div>
+                    
+                    <div class="progress-wrapper" id="progressWrapper">
+                        <div style="font-size:12px; margin-bottom:2px;">解析中: <span id="progressText">0/0</span></div>
+                        <progress id="analyzeProgress" value="0" max="100"></progress>
+                    </div>
+                </div>
+            </div>
+
+        <div id="graph-container">
+    <div id="graph-header">
+        <span>評価値グラフ</span>
+        <button class="graph-close-btn" onclick="app.closeGraph()">×</button>
+    </div>
+    
+    <div class="chart-wrapper">
+        <canvas id="evalChart"></canvas>
+    </div>
+
+    <div class="g-resizer g-resizer-t"></div>
+    <div class="g-resizer g-resizer-r"></div>
+    <div class="g-resizer g-resizer-tr"></div>
+</div>
+            <div id="stats-container">
+    <div id="stats-window-header">
+        <span style="margin-left:5px;">解析結果</span>
+        <div class="window-controls">
+            <button class="win-btn" onclick="app.toggleStatsMin()">－</button>
+            <button class="win-btn" onclick="app.toggleStatsMax()">□</button>
+            <button class="win-btn close" onclick="app.closeStats()">×</button>
+        </div>
+    </div>
+
+ 
+
+    <div id="stats-content-area">
+        <table class="summary-table">
+            <thead><tr><th>判定</th><th>黒番</th><th>白番</th></tr></thead>
+            <tbody id="statsSummaryBody"></tbody>
+        </table>
+        <div style="font-weight:bold; margin:10px 0 5px 0; border-bottom:1px solid #ccc;">詳細</div>
+        <table class="detail-table">
+            <thead>
+                <tr>
+                    <th style="width:25px">#</th>
+                    <th style="width:35px">着手</th>
+                    <th style="width:45px">評価値</th>
+                    <th style="width:40px">時間</th>
+                    <th>判定 / 推奨手</th>
+                </tr>
+            </thead>
+            <tbody id="statsDetailBody"></tbody>
+        </table>
+    </div>
+
+    <div class="resizer resizer-l"></div>  <div class="resizer resizer-t"></div>  <div class="resizer resizer-tl"></div><div class="resizer resizer-b"></div>  </div>
+       <div id="pv-container">
+        <div id="pv-header">
+            <span>Rapfi読み筋プレビュー</span>
+            <button class="win-btn close" onclick="app.closePvWindow()">×</button>
+        </div>
+        <div id="pv-content">
+            </div>
+        <div class="g-resizer g-resizer-t"></div>
+        <div class="g-resizer g-resizer-r"></div>
+        <div class="g-resizer g-resizer-tr"></div>
+    </div>
+
+    <div id="loadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">保存された棋譜一覧</div>
+            <div id="statsBar" style="background:#eef; padding:10px; border-radius:4px; margin-bottom:10px; font-weight:bold; text-align:center; border:1px solid #ccd;">
+                集計中...
+            </div>
+            <ul id="modalList" class="modal-list"></ul>
+            <div class="modal-footer">
+                <button class="modal-btn btn-delete" onclick="app.deleteSelectedRecord()">Delete</button>
+                <button class="modal-btn btn-cancel" onclick="app.closeLoadModal()">Cancel</button>
+                <button class="modal-btn btn-open" onclick="app.openSelectedRecord()">Open</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="engineModal" class="modal">
+        <div class="modal-content" style="width: 450px;">
+            <div id="timeSettingsMount"></div>
+            
+            <div class="tab-header">
+                <button class="tab-btn active" onclick="app.switchTab('engine')">対局 (Engine)</button>
+                <button class="tab-btn" onclick="app.switchTab('analysis')">解析 (Analysis)</button>
+                <button class="tab-btn" onclick="app.switchTab('ui')">UI</button>
+            </div>
+            
+
+            <div id="tab-engine" class="tab-content active">
+                <div class="controls" style="box-shadow:none; padding:0; background:transparent;">
+                    <div class="row" style="margin-bottom:10px; border-bottom:1px dashed #ccc; padding-bottom:10px;">
+                        <input type="checkbox" id="confResetBoard" style="width:20px; height:20px;">
+                        <label for="confResetBoard" style="cursor:pointer;">
+                            2局目以降、開始時に盤面リセットを確認する<br>
+                            <span style="font-size:10px; font-weight:normal; color:#666;">(OFFの場合、確認せず現在の盤面から対局を開始します)</span>
+                        </label>
+                    </div>
+                  <div class="row">
+    <label>引き分け手数 (MAX_MOVES)<br><span style="font-size:10px; font-weight:normal;">(0:無制限, 150:旧ルールに準拠)</span></label>
+    <input type="number" id="engMaxMoves" value="150">
+</div>
+                    <div class="row">
+                        <label>スレッド数 (THREAD_NUM)</label>
+                        <input type="number" id="engThreads" value="1" min="1">
+                    </div>
+                    <div id="iosThreadNotice" style="display:none; margin:-2px 0 8px; font-size:11px; color:#64748b;">
+                        iOSではマルチスレッドは使えません
+                    </div>
+                    <div class="row">
+                        <label>最大ノード (MAX_NODE/k)<br><span style="font-size:10px; font-weight:normal;">(0:無制限)</span></label>
+                        <input type="number" id="engMaxNodes" value="0">
+                    </div>
+                    <div class="row">
+                        <label>候補手の数 (MultiPV)<br><span style="font-size:10px; font-weight:normal;">(候補手から完全ランダムに手が選ばれる)</span></label>
+                        <input type="number" id="engMultiPV" value="1" min="1" max="100" style="width:50px;">
+                    </div>
+                    <div class="row">
+                        <label>思考時間の割合 (%)<br><span style="font-size:10px; font-weight:normal;">持ち時間＋加算ルールで、残り時間の何%を一手に使うか</span></label>
+                        <input type="number" id="engTurnTimePercent" value="20" min="1" max="100" step="1" style="width:60px; text-align:right;">
+                    </div>
+                    <div class="row">
+                        <label>思考時間マージン (ms)<br><span style="font-size:10px; font-weight:normal;">通信遅延対策として一手の思考時間から差し引く時間</span></label>
+                        <input type="number" id="engTurnTimeMarginMs" value="500" min="0" step="100" style="width:70px; text-align:right;">
+                    </div>
+                    <div class="row">
+                        <label>悪手除外の閾値<br><span style="font-size:10px; font-weight:normal;">(候補手からのランダム選択において評価値がこの数値より悪い手を可能な限り避ける)</span></label>
+                        <input type="number" id="engBlunderThreshold" value="-200" step="10" style="width:60px; text-align:right;">
+                    </div>
+                    <div class="row">
+                        <label>悪手率 (Blunder Rate %)<br><span style="font-size:10px; font-weight:normal;">(候補手の中から意図的に悪手を選ばせる確率。悪手がない場合は候補手からランダム選択となる。<br>悪手とはここでは最善手から300点以上損する手。悪手を打つとき、悪手閾値の設定を無視する)</span></label>
+                        <input type="number" id="engBlunderRate" value="5" min="0" max="100" style="width:50px; text-align:right;">
+                    </div>
+                    <div class="row">
+                        <label>メイト見逃し (N手以上)<br><span style="font-size:10px; font-weight:normal;">(N手以上のメイトを可能な限り確実に見送り、その他の手から選択する。<br>但し数値上見逃さないメイトがあっても着手はランダムで選ばれる。0で無効)</span></label>
+                        <input type="number" id="engMissMateRate" value="30" min="0" style="width:50px; text-align:right;">
+                    </div>
+                    <div class="row" style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px;">
+                        <input type="checkbox" id="engHumanStyle" style="width:20px; height:20px;">
+                        <label for="engHumanStyle" style="color:#28a745; cursor:pointer;">
+                            人間の強豪らしい打ち筋 (Play like a strong human player)<br>
+                            <span style="font-size:10px; font-weight:normal; color:#666;">※<br>有効時、他の全ての設定に優先して独自の設定が適用されます。<br></span>
+                        </label>
+                    </div>
+                    <div class="row">
+                        <label>ハッシュサイズ(KB) (HASH_SIZE)</label>
+                        <input type="number" id="engHashSize" value="17000" step="1000" style="width:80px;">
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-analysis" class="tab-content">
+                <div class="controls" style="box-shadow:none; padding:0; background:transparent;">
+                    <div style="margin-bottom:15px; font-size:12px; color:#666;">
+                        「棋譜解析」ボタンを押した際に使用される設定です。
+                    </div>
+                    <div class="row">
+                        <label>開始手数</label>
+                        <div><input type="number" id="analyzeStartMove" value="6" min="1" style="width:50px;"> 手目から</div>
+                    </div>
+                    <div class="row">
+                        <label>解析時間/手 (秒)<br><span style="font-size:10px; font-weight:normal;">(推奨: 5秒以上)</span></label>
+                        <div><input type="number" id="analyzeTime" value="5" step="0.5" min="0.5"> 秒</div>
+                    </div>
+                    <div class="row">
+                        <label>候補手の数 (MultiPV)<br><span style="font-size:10px; font-weight:normal;">(解析時の読み筋の数)</span></label>
+                        <div><input type="number" id="analyzeNBest" value="3" min="1" max="20" style="width:50px;"></div>
+                    </div>
+                    <div class="row">
+                        <label>解析スレッド数</label>
+                        <div><input type="number" id="analyzeThreads" value="4" min="1" style="width:50px;"></div>
+                    </div>
+                    <div class="row">
+                        <label>ハッシュサイズ(KB)</label>
+                        <div><input type="number" id="analyzeHashSize" value="17000" step="1024" style="width:80px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-ui" class="tab-content">
+                <div class="controls" style="box-shadow:none; padding:0; background:transparent;">
+                    <div style="margin-bottom:15px; font-size:12px; color:#666;">
+                        連珠盤の見た目に関する設定です。
+                    </div>
+                    <div class="row">
+                        <label>盤面の背景色</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="color" id="uiBoardColor" value="#F9EBCF" onchange="app.setBoardColor(this.value)" style="width: 40px; height: 30px; padding: 0; cursor: pointer;">
+                            <button class="nav-btn board-color-swatch" style="width:40px;  height: 30px; padding: 4px 8px; --swatch-color: #F9EBCF;" onclick="app.setBoardColorPreset('#F9EBCF')"></button>
+                            <button class="nav-btn board-color-swatch" style="width:40px;  height: 30px; padding: 4px 8px; --swatch-color: #F9D65B;" onclick="app.setBoardColorPreset('#F9D65B')"></button>
+                            <button class="nav-btn board-color-swatch" style="width:40px;  height: 30px; padding: 4px 8px; --swatch-color: #FFFFFF;" onclick="app.setBoardColorPreset('#FFFFFF')"></button>
+                             <button class="nav-btn board-color-swatch" style="width:40px;  height: 30px; padding: 4px 8px; --swatch-color: #008000;" onclick="app.setBoardColorPreset('#008000')"></button>
+                              <button class="nav-btn board-color-swatch" style="width:40px;  height: 30px; padding: 4px 8px; --swatch-color: #6495ed;" onclick="app.setBoardColorPreset('#6495ed')"></button>
+                              <button class="nav-btn board-color-swatch" style="width:40px;  height: 30px; padding: 4px 8px; --swatch-color: #778899;" onclick="app.setBoardColorPreset('#778899')"></button>
+                              <button class="nav-btn board-color-swatch" style="width:40px;  height: 30px; padding: 4px 8px; --swatch-color: #ffc0cb;" onclick="app.setBoardColorPreset('#ffc0cb')"></button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <label>着手音</label>
+                        <div><input type="checkbox" id="uiMoveSound" checked onchange="app.applyUiSettings()"></div>
+                    </div>
+                    <div class="row">
+                        <label>持ち時間の音</label>
+                        <div><input type="checkbox" id="uiTimeSound" checked onchange="app.applyUiSettings()"></div>
+                    </div>
+                    <div class="row">
+                        <label>連珠盤座標表示</label>
+                        <div><input type="checkbox" id="uiBoardCoords" checked onchange="app.applyUiSettings()"></div>
+                    </div>
+                    <div class="row">
+                        <label>石の陰影</label>
+                        <div><input type="checkbox" id="uiStoneShading" checked onchange="app.applyUiSettings()"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="modal-btn" style="background-color:#6c757d; margin-right:auto;" onclick="app.loadDefaultEngineSettings()">初期設定に戻す</button>
+                <button class="modal-btn btn-open" onclick="app.saveEngineSettings()">保存して閉じる</button>
+                <button class="modal-btn btn-cancel" onclick="app.closeEngineSettings()">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="quizModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">次の一手問題集</div>
+            <div style="margin-bottom: 10px; font-size: 12px; color: #666;">
+                解析結果から「悪手」「疑問手」などの局面を抽出しました。<br>
+                クリックして挑戦してください。
+            </div>
+            <ul id="quizListDisplay" class="modal-list"></ul>
+            <div class="modal-footer">
+                <button class="modal-btn" style="background-color:#17a2b8;" onclick="app.downloadQuizJson()">JSON保存</button>
+                <button class="modal-btn" style="background-color:#6f42c1;" onclick="app.downloadQuizPdf()">PDF作成</button>
+                <button class="modal-btn" style="background-color:#20c997;" onclick="app.toggleSelectAllQuizzes(this)">全て選択</button>
+                <button class="modal-btn btn-delete" onclick="app.deleteSelectedQuizzes()">選択した問題を削除</button>
+                <button class="modal-btn btn-cancel" onclick="app.closeQuizModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    <div id="portalExportModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <h3>連珠ポータル URL出力</h3>
+        
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">Renju Portal v2</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="portalUrlV2" readonly style="flex: 1; padding: 5px;">
+                <button class="btn btn-primary" onclick="app.copyToClipboard('portalUrlV2')">Copy</button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight: bold;">Renju Portal v1 (旧)</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="portalUrlV1" readonly style="flex: 1; padding: 5px;">
+                <button class="btn btn-primary" onclick="app.copyToClipboard('portalUrlV1')">Copy</button>
+            </div>
+        </div>
+
+        <div style="text-align: right;">
+            <button class="btn btn-secondary" onclick="document.getElementById('portalExportModal').style.display='none'">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<div id="pvReviewModal" class="modal">
+        <div class="modal-content" style="width: 480px; text-align: center;">
+            <div class="modal-header">Rapfi 読み筋の確認 (Rank <span id="pvReviewRank"></span>)</div>
+            
+            <div class="board-wrapper" style="margin: 0 auto; width: 440px;">
+                <canvas id="pvReviewCanvas" width="440" height="440"></canvas>
+            </div>
+            
+            <div style="margin-top: 15px; font-size: 16px; font-weight: bold; height: 24px;" id="pvReviewText"></div>
+            
+            <div class="modal-footer" style="justify-content: center; gap: 15px;">
+                <button class="modal-btn" style="background:#6c757d; font-size:16px;" onclick="app.pvReviewFirst()">◀◀</button>
+                <button class="modal-btn" style="background:#6c757d; font-size:16px;" onclick="app.pvReviewPrev()">◀</button>
+                <button class="modal-btn" style="background:#007bff; font-size:16px;" onclick="app.pvReviewNext()">▶</button>
+                <button class="modal-btn" style="background:#007bff; font-size:16px;" onclick="app.pvReviewLast()">▶ ▶</button>
+            </div>
+
+            <div id="pvReviewNotation" style="width: 400px; margin: 15px auto 0; padding: 10px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; text-align: left; word-wrap: break-word; min-height: 22px; font-family: monospace;">
+            </div>
+            
+           
+            
+            <div class="modal-footer" style="margin-top: 10px;">
+                <button class="modal-btn btn-cancel" onclick="app.closePvReview()">閉じる</button>
+            </div>
+        </div>
+    </div>
+<script type="module" src="/src/frontend/main.js"></script>
+</body>
+</html>

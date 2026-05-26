@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Production build output
+dist/
+
+# Engine binaries (neural network models, lz4 weights, and webassembly files)
+public/engine/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvsca
+*.njsproj
+*.sln
+*.swp
+
+# Local env files
+.env
+.env.local
+.env.*.local
