@@ -130,7 +130,7 @@ export async function startGameSession(ctx, data) {
     const ready = await ctx.engineRuntime.ensureReady();
     if (!ready) {
         ctx.broadcastLog('[ERROR] Engine did not become ready before game start.');
-        if (DEBUG_MODE) console.error('[Backend DEBUG] start_game aborted: Rapfi ready timeout');
+        if (DEBUG_MODE) console.error('[AppCore DEBUG] start_game aborted: Rapfi ready timeout');
         return;
     }
 
@@ -165,13 +165,13 @@ export async function handlePlayerMove(ctx, move) {
 
         const ready = await ctx.engineRuntime.ensureReady();
         if (!ready) {
-            if (DEBUG_MODE) console.error("[Backend DEBUG] player_move aborted: engine not ready");
+            if (DEBUG_MODE) console.error("[AppCore DEBUG] player_move aborted: engine not ready");
             return;
         }
 
         if (!ctx.getGameRunning() || ctx.getGameEnded()) return;
 
-        if (DEBUG_MODE) console.log(`[Backend DEBUG] Player moved. Setting isRapfiThinking = true and calling syncAndThink`);
+        if (DEBUG_MODE) console.log(`[AppCore DEBUG] Player moved. Setting isRapfiThinking = true and calling syncAndThink`);
         ctx.setRapfiThinking(true);
         if (rapfiTimer) rapfiTimer.start();
         ctx.syncAndThink(ctx.getAiColorGlobal());

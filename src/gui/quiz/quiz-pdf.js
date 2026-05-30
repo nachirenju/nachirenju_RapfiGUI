@@ -91,7 +91,7 @@ export function installQuizPdfMethods(proto) {
             }
 
             const boardMargin = 80; const boardSizePx = w - (boardMargin * 2); const boardTop = 330; 
-            ctx.fillStyle = "#F9EBCF"; ctx.fillRect(boardMargin, boardTop, boardSizePx, boardSizePx);
+            ctx.fillStyle = "#F2E2BF"; ctx.fillRect(boardMargin, boardTop, boardSizePx, boardSizePx);
             ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.beginPath();
             const cellSize = boardSizePx / 15; 
             const getX = (x) => boardMargin + (x + 0.5) * cellSize;

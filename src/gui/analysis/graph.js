@@ -39,17 +39,31 @@ export function installGraphMethods(proto) {
 
             // 4. 表示の反映
             scoreEl.textContent = scoreDisplay;
-            
-            // 色分け：その時の思考側が有利なら青、不利なら赤
-            if (scoreVal > 0) {
-                scoreEl.style.color = "#007bff"; // 青 (AI有利)
-            } else if (scoreVal < 0) {
-                scoreEl.style.color = "#d00";    // 赤 (AI不利)
-            } else {
-                scoreEl.style.color = "#333";
-            }
-
             rateEl.textContent = winRatePct + "%";
+            
+            // 色分け：黒有利：#2F80FF、白有利：#FF5C7A、互角：#B8C0CC
+            const isBlackTurn = (this.moveHistory ? this.moveHistory.length : 0) % 2 === 0;
+            let color = '#B8C0CC'; // 互角
+            
+            let isBlackAdv = false;
+            let isWhiteAdv = false;
+            
+            if (isBlackTurn) {
+                if (scoreVal > 50) isBlackAdv = true;
+                else if (scoreVal < -50) isWhiteAdv = true;
+            } else {
+                if (scoreVal > 50) isWhiteAdv = true;
+                else if (scoreVal < -50) isBlackAdv = true;
+            }
+            
+            if (isBlackAdv) {
+                color = '#2F80FF';
+            } else if (isWhiteAdv) {
+                color = '#FF5C7A';
+            }
+            
+            scoreEl.style.color = color;
+            rateEl.style.color = color;
         
     };
 
@@ -58,8 +72,9 @@ export function installGraphMethods(proto) {
             const rateEl = document.getElementById('rtWinRate');
             if (scoreEl && rateEl) {
                 scoreEl.textContent = "--";
-                scoreEl.style.color = "#333";
+                scoreEl.style.color = "#B8C0CC";
                 rateEl.textContent = "--%";
+                rateEl.style.color = "#B8C0CC";
             }
         
     };

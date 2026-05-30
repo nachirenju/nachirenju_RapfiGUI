@@ -18,6 +18,7 @@ export function installDefaultEngineSettings(app) {
         document.getElementById('engMaxMoves').value = 150;
         document.getElementById('engThreads').value = 1;
         document.getElementById('engMaxNodes').value = 0;
+        document.getElementById('engMaxDepth').value = 50;
         document.getElementById('engHashSize').value = 17000;
        // document.getElementById('engStrength').value = 100;
        // document.getElementById('engStrengthVal').textContent = "100"; 
@@ -29,12 +30,12 @@ export function installDefaultEngineSettings(app) {
         document.getElementById('timeRuleMode').value = "normal";
         document.getElementById('playerPerMoveSec').value = 10;
         document.getElementById('aiPerMoveSec').value = 10;
-        document.getElementById('uiBoardColor').value = "#F9EBCF";
+        document.getElementById('uiBoardColor').value = "#F2E2BF";
         document.getElementById('uiMoveSound').checked = true;
         document.getElementById('uiTimeSound').checked = true;
         document.getElementById('uiBoardCoords').checked = true;
         document.getElementById('uiStoneShading').checked = true;
-        app.setBoardColor("#F9EBCF");
+        app.setBoardColor("#F2E2BF");
         app.applyUiSettings();
         app.updateTimeRuleUi();
 

@@ -37,7 +37,7 @@ export function installQuizListMethods(proto) {
                 const turnText = q.turn === 1 ? "黒番" : "白番";
                 li.innerHTML = `
                     <input type="checkbox" class="quiz-checkbox" value="${q.id}">
-                    <img src="${thumbUrl}" class="quiz-thumbnail" style="width:80px; height:80px; margin-right:10px; border:1px solid #ccc; background:#F9EBCF;">
+                    <img src="${thumbUrl}" class="quiz-thumbnail" style="width:80px; height:80px; margin-right:10px; border:1px solid #ccc; background:#F2E2BF;">
                     <div style="flex:1; cursor:pointer;" onclick="window.app.startQuiz(${q.id})">
                         <div style="margin-bottom:4px;">
                             <span class="quiz-badge ${badgeClass}">${q.type}</span> 

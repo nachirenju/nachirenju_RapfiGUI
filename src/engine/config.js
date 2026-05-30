@@ -15,6 +15,7 @@ export function createGameConfigCommands(settings, threadCount) {
         `INFO STRENGTH ${es.strength || 100}`,
         `INFO THREAD_NUM ${threadCount}`,
         `INFO MAX_NODE ${es.maxNodes ? es.maxNodes * 1000 : 0}`,
+        `INFO MAX_DEPTH ${es.maxDepth !== undefined ? es.maxDepth : 50}`,
         `INFO HASH_SIZE ${es.hashSize || 1024}`
     ];
 

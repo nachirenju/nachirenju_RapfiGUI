@@ -123,10 +123,10 @@ const engineRuntime = createEngineRuntime({
         console.log(`[Engine exit] ${c}`);
         if (c === 0) {
             if (!isGameRunning || isResearchMode || isAnalysisRunning() || isIntentionalKill) {
-                if (DEBUG_MODE) console.log("[Backend DEBUG] Engine exited with 0. No automatic reload for current mode.");
+                if (DEBUG_MODE) console.log("[AppCore DEBUG] Engine exited with 0. No automatic reload for current mode.");
                 return;
             }
-            if (DEBUG_MODE) console.log("[Backend DEBUG] Engine exited with 0. Reloading engine for the next move...");
+            if (DEBUG_MODE) console.log("[AppCore DEBUG] Engine exited with 0. Reloading engine for the next move...");
             engineRuntime.start();
             return;
         }
@@ -203,6 +203,7 @@ function clearAnalysisTimeout() {
 }
 
 let isResearchMode = false;
+let isInitializingEngine = false;
 
 let gameLoopInterval = null;
 
@@ -373,10 +374,10 @@ function processEngineLine(line) {
 
 
     // デバッグ用：WASMから受け取った生データ
-    if (DEBUG_MODE) console.log(`[Backend DEBUG] processEngineLine received: "${line}"`);
+    if (DEBUG_MODE) console.log(`[AppCore DEBUG] processEngineLine received: "${line}"`);
 
     if (isInformational) {
-        if (DEBUG_MODE) console.log(`[Backend DEBUG] Engine informational: ${line}`);
+        if (DEBUG_MODE) console.log(`[AppCore DEBUG] Engine informational: ${line}`);
     }
     if (isWarning) {
         broadcastLog('[Warning] ' + line);
@@ -396,6 +397,8 @@ function processEngineLine(line) {
         if (becameIdle) schedulePendingIOSResearch();
 
     }
+
+    if (isInitializingEngine) return;
 
     broadcastEngineLine(line, lineInfo);
 
@@ -523,7 +526,22 @@ function sendEngineConfig() {
 async function initializeGameSession() {
     sendEngineConfig();
     sendToEngine(`START ${BOARD_SIZE}`);
-    await delay(300);
+    
+    isInitializingEngine = true;
+    if (DEBUG_MODE) console.log("[AppCore DEBUG] Triggering dummy search for engine initialization...");
+    engineRuntime.setBusy(true);
+    sendToEngine(`INFO TIME_LEFT 1`);
+    sendToEngine(`INFO TIMEOUT_TURN 1`);
+    sendToEngine('YXBOARD\nDONE');
+    sendToEngine('YXNBEST 1');
+    
+    let waitTime = 0;
+    while (engineRuntime.getIsBusy() && waitTime < 15000) {
+        await delay(100);
+        waitTime += 100;
+    }
+    isInitializingEngine = false;
+    if (DEBUG_MODE) console.log(`[AppCore DEBUG] Engine initialization finished after ${waitTime}ms.`);
 }
 
 async function initializeResearchSession() {
@@ -538,7 +556,7 @@ async function initializeResearchSession() {
 
 async function syncAndThink(aiColor) {
     if (!engineRuntime.getIsReady()) {
-        if (DEBUG_MODE) console.log('[Backend DEBUG] syncAndThink skipped because engineRuntime.getIsReady() is false');
+        if (DEBUG_MODE) console.log('[AppCore DEBUG] syncAndThink skipped because engineRuntime.getIsReady() is false');
         return;
     }
     if (!rapfiTimer) return;

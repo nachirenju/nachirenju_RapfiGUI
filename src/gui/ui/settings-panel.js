@@ -86,6 +86,7 @@ export function installSettingsMethods(proto) {
             engMaxMoves: document.getElementById('engMaxMoves').value,
             engThreads: document.getElementById('engThreads').value,
             engMaxNodes: document.getElementById('engMaxNodes').value,
+            engMaxDepth: document.getElementById('engMaxDepth').value,
             engHashSize: document.getElementById('engHashSize').value,
             engMultiPV: document.getElementById('engMultiPV').value,
             engTurnTimePercent: document.getElementById('engTurnTimePercent').value,
@@ -128,6 +129,7 @@ export function installSettingsMethods(proto) {
                 if (c.engMaxMoves !== undefined) document.getElementById('engMaxMoves').value = c.engMaxMoves;
                 if (c.engThreads !== undefined) document.getElementById('engThreads').value = c.engThreads;
                 if (c.engMaxNodes !== undefined) document.getElementById('engMaxNodes').value = c.engMaxNodes;
+                if (c.engMaxDepth !== undefined) document.getElementById('engMaxDepth').value = c.engMaxDepth;
                 if (c.engHashSize !== undefined) document.getElementById('engHashSize').value = c.engHashSize;
                 if (c.engMultiPV !== undefined) document.getElementById('engMultiPV').value = c.engMultiPV;
                 if (c.engTurnTimePercent !== undefined) document.getElementById('engTurnTimePercent').value = c.engTurnTimePercent;
@@ -142,8 +144,10 @@ export function installSettingsMethods(proto) {
                 if (c.anaThreads !== undefined) document.getElementById('analyzeThreads').value = c.anaThreads;
                 if (c.anaHashSize !== undefined) document.getElementById('analyzeHashSize').value = c.anaHashSize;
                 if (c.uiBoardColor !== undefined) {
-                    document.getElementById('uiBoardColor').value = c.uiBoardColor;
-                    this.setBoardColor(c.uiBoardColor);
+                    let boardColor = c.uiBoardColor;
+                    if (boardColor === "#F9EBCF") boardColor = "#F2E2BF";
+                    document.getElementById('uiBoardColor').value = boardColor;
+                    this.setBoardColor(boardColor);
                 }
                 if (c.uiMoveSound !== undefined) document.getElementById('uiMoveSound').checked = c.uiMoveSound;
                 if (c.uiTimeSound !== undefined) document.getElementById('uiTimeSound').checked = c.uiTimeSound;

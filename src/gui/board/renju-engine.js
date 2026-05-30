@@ -137,7 +137,7 @@ export const BOARD_SIZE = 15;
         const ctx = this.bgCtx;
         
         // 背景色
-        ctx.fillStyle = this.boardColor || "#F9EBCF";
+        ctx.fillStyle = this.boardColor || "#F2E2BF";
         ctx.fillRect(0, 0, this.bgCanvas.width, this.bgCanvas.height);
         
         if (this.showBoardCoordinates !== false) {

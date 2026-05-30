@@ -29,13 +29,13 @@ export function installModalMethods(proto) {
             const cellSize = w / 15; // 15路盤
             
             // 背景
-            ctx.fillStyle = "#F9EBCF";
+            ctx.fillStyle = "#F2E2BF";
             ctx.fillRect(0, 0, w, h);
             
             // 罫線
             ctx.beginPath();
             ctx.lineWidth = 0.5;
-            ctx.strokeStyle = "#888";
+            ctx.strokeStyle = "#000";
             for(let i=0; i<15; i++) {
                 const p = (i + 0.5) * cellSize;
                 ctx.moveTo(p, cellSize/2);
@@ -83,15 +83,15 @@ export function installModalMethods(proto) {
             let w = 0, l = 0, d = 0;
             let lastDateStr = null;
             this.recordList.forEach((r, index) => {
-                let titleColor = "#666"; 
+                let titleColor = "#8a94a6"; 
                 if (r.winner) {
-                    if (r.winner === 'User') { w++; titleColor = "#007bff"; } 
-                    else if (r.winner === 'Rapfi') { l++; titleColor = "#dc3545"; } 
-                    else { d++; titleColor = "#666"; }
+                    if (r.winner === 'User') { w++; titleColor = "#2F80FF"; } 
+                    else if (r.winner === 'Rapfi') { l++; titleColor = "#FF5C7A"; } 
+                    else { d++; titleColor = "#8a94a6"; }
                 } else {
-                    if (r.title.includes("Draw")) { d++; titleColor = "#666"; } 
-                    else if ((r.title.includes("●User") && r.title.includes("Black win")) || (!r.title.includes("●User") && r.title.includes("White win"))) { w++; titleColor = "#007bff"; } 
-                    else { l++; titleColor = "#dc3545"; }
+                    if (r.title.includes("Draw")) { d++; titleColor = "#8a94a6"; } 
+                    else if ((r.title.includes("●User") && r.title.includes("Black win")) || (!r.title.includes("●User") && r.title.includes("White win"))) { w++; titleColor = "#2F80FF"; } 
+                    else { l++; titleColor = "#FF5C7A"; }
                 }
 
                 const li = document.createElement('li');
@@ -129,12 +129,12 @@ export function installModalMethods(proto) {
                 textContainer.style.justifyContent = "center";
                 
                 const numDiv = document.createElement('div');
-                numDiv.innerHTML = `<span style="font-size:18px; font-weight:bold; color:#333;">${numStr}</span>`;
+                numDiv.innerHTML = `<span style="font-size:18px; font-weight:bold; color:var(--text-main);">${numStr}</span>`;
                 numDiv.style.marginBottom = "12px"; 
 
                 const infoDiv = document.createElement('div');
                 infoDiv.style.fontSize = "13px";
-                infoDiv.style.color = "#555";
+                infoDiv.style.color = "var(--text-muted)";
                 infoDiv.innerHTML = `
                     <span style="font-family:monospace; font-weight:bold;">${dateDisplayHtml}</span> 
                     <span style="margin-left:8px; color:${titleColor}; font-weight:bold;">${simpleTitle}</span>
@@ -156,7 +156,7 @@ export function installModalMethods(proto) {
             });
             const t = w + l + d;
             const rate = t > 0 ? ((w / t) * 100).toFixed(1) : "0.0";
-            document.getElementById('statsBar').innerHTML = `<span style="color:#007bff">Win: ${w}</span> - <span style="color:#dc3545">Loss: ${l}</span> - <span style="color:#666">Draw: ${d}</span> (勝率 ${rate}%)`;
+            document.getElementById('statsBar').innerHTML = `<span style="color:#2F80FF">Win: ${w}</span> - <span style="color:#FF5C7A">Loss: ${l}</span> - <span style="color:#8A94A6">Draw: ${d}</span> (勝率 ${rate}%)`;
         
     };
 

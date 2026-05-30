@@ -28,7 +28,7 @@ export function sendEngineCommand(processLike, cmd, options = {}) {
         if (debugMode && !isAnalyzing) {
             console.log(`\x1b[35m[To AI]\x1b[0m ${trimmedCmd}`);
         } else {
-            if (DEBUG_MODE) console.log(`[Backend DEBUG] sendToRapfi: "${trimmedCmd}"`);
+            if (DEBUG_MODE) console.log(`[AppCore DEBUG] sendToRapfi: "${trimmedCmd}"`);
         }
     }
 

@@ -70,10 +70,10 @@ export function installResearchMethods(proto) {
             const cellSize = w / 15;
             
             // 1. 背景と線を引く
-            ctx.fillStyle = this.boardColor || "#F9EBCF";
+            ctx.fillStyle = this.boardColor || "#F2E2BF";
             ctx.fillRect(0, 0, w, w);
             ctx.beginPath();
-            ctx.strokeStyle = "#2b2b2b";
+            ctx.strokeStyle = "#000";
             ctx.lineWidth = 1;
             for(let i=0; i<15; i++) {
                 const p = (i + 0.5) * cellSize;
@@ -297,13 +297,13 @@ export function installResearchMethods(proto) {
                 fullMoves.forEach((move, index) => {
                     if (index === currentFocusIndex) {
                         // 現在見ている手（直前に打たれた手）
-                        notationHtml += `<span style="color: red; font-weight: bold; background-color: #ffe6e6;">${move}</span>`;
+                        notationHtml += `<span style="color: #FF5C7A; font-weight: bold; background-color: rgba(255, 92, 122, 0.15); border-radius: 3px; padding: 1px 3px;">${move}</span>`;
                     } else if (index < currentFocusIndex) {
                         // 既に盤面に置かれている手（実戦＋進めた読み筋）
-                        notationHtml += `<span style="color: #000;">${move}</span>`;
+                        notationHtml += `<span style="color: var(--text-main); font-weight: 500;">${move}</span>`;
                     } else {
                         // まだ進めていない先の手（未来の読み筋）
-                        notationHtml += `<span style="color: #bbb;">${move}</span>`;
+                        notationHtml += `<span style="color: var(--text-muted);">${move}</span>`;
                     }
                 });
                 
@@ -339,7 +339,7 @@ export function installResearchMethods(proto) {
     const btn = document.getElementById('btnResearch');
     
     if (this.isResearchMode) {
-        btn.style.background = "#ff4081"; // ON時の色
+        btn.classList.add('active');
         btn.textContent = "計算停止";
         this.statusEl.textContent = "研究モード: 盤面をクリックして進行 / AI解析中...";
         this.researchCandidates = {}; // リセット
@@ -358,7 +358,7 @@ export function installResearchMethods(proto) {
                     backendCommands.researchSync(this.moveHistory, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
                 }
     } else {
-        btn.style.background = "green"; // OFF時の色
+        btn.classList.remove('active');
         btn.textContent = "研究モード";
         this.statusEl.textContent = "検討モード";
         this.researchCandidates = {};

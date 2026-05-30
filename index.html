@@ -25,7 +25,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rapfi GUI</title>
     <script src="%BASE_URL%preload_shim.js" vite-ignore></script>
-    <script type="module" src="/src/backend.js"></script>
+    <script type="module" src="/src/app-core.js"></script>
     <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
     <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@latest"></script>
@@ -1156,7 +1156,7 @@ body {
                             <input type="checkbox" id="debugModeToggle">
                             <span class="debug-slider"></span>
                         </label>
-                        <label for="debugModeToggle" style="font-weight: normal; font-size: 12px; cursor: pointer; color: #888;">🛠 デバッグモード</label>
+                        <label for="debugModeToggle" style="font-weight: normal; font-size: 12px; cursor: pointer; color: #888;">🛠 デバッグモード(開発者用)</label>
                     </div>
 
                     <div id="status">対局準備中 (編集モード)</div>
@@ -1276,6 +1276,10 @@ body {
                     <div class="row">
                         <label>最大ノード (MAX_NODE/k)<br><span style="font-size:10px; font-weight:normal;">(0:無制限)</span></label>
                         <input type="number" id="engMaxNodes" value="0">
+                    </div>
+                    <div class="row">
+                        <label>最大深さ (MAX_DEPTH)<br><span style="font-size:10px; font-weight:normal;">(10~15程度で人間に近い挙動になります。0:無制限)</span></label>
+                        <input type="number" id="engMaxDepth" value="50">
                     </div>
                     <div class="row">
                         <label>候補手の数 (MultiPV)<br><span style="font-size:10px; font-weight:normal;">(候補手から完全ランダムに手が選ばれる)</span></label>
@@ -1458,6 +1462,6 @@ body {
             </div>
         </div>
     </div>
-<script type="module" src="/src/frontend/main.js"></script>
+<script type="module" src="/src/gui/main.js"></script>
 </body>
 </html>

@@ -183,6 +183,7 @@ export function installGameControlMethods(proto) {
                 threads: this.isIOSDevice ? 1 : document.getElementById('engThreads').value,
                 maxNodes: document.getElementById('engMaxNodes').value,
                 strength: 100,
+                maxDepth: document.getElementById('engMaxDepth').value,
                 hashSize: document.getElementById('engHashSize').value,
                 nbest: document.getElementById('engMultiPV').value,
                 turnTimePercent: document.getElementById('engTurnTimePercent').value,
