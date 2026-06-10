@@ -138,6 +138,11 @@ export function installGameControlMethods(proto) {
             if (this.isResearchMode) {
                 this.toggleResearchMode(); 
             }
+            this.challengeMode = false;
+            const cec = document.getElementById('challengeEndControls');
+            if (cec) cec.style.display = 'none';
+            const clbl = document.getElementById('challengeLabel');
+            if (clbl) clbl.style.display = 'none';
             this.clearRealtimeEval();
 
             //二局目以降設定ON時、盤面リセットの確認

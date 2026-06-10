@@ -29,6 +29,8 @@ import {
     handlePlayerMove as handleGamePlayerMove,
     pauseRunningTimer,
     startGameSession,
+    startChallengeGameSession,
+    stopAllActiveModesForChallengeSession,
     stopGameTimers as stopGameSessionTimers,
     takebackPlayerMove as takebackGamePlayerMove
 } from './game/session.js';
@@ -1012,6 +1014,14 @@ window.backendAPI_undo_move = function() {
 
 window.backendAPI_takeback_move = async function() {
     await takebackPlayerMove("player takeback");
+};
+
+window.backendAPI_start_challenge_game = async function(data) {
+    await startChallengeGameSession(createGameSessionContext(), data);
+};
+
+window.backendAPI_stop_all_active_modes_for_challenge = async function() {
+    await stopAllActiveModesForChallengeSession(createGameSessionContext());
 };
 
 window.backendAPI_finish_game = function() {

@@ -22,3 +22,7 @@ public/engine/
 .env
 .env.local
 .env.*.local
+
+# Challenge Mode Data
+public/missingwin.json
+missingwin.json

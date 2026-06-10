@@ -89,3 +89,11 @@ export function takebackMove() {
 export function finishGame() {
     getApi()?.finishGame();
 }
+
+export function startChallengeGame(options) {
+    return getApi()?.startChallengeGame?.(options);
+}
+
+export function stopAllActiveModesForChallenge() {
+    return getApi()?.stopAllActiveModesForChallenge?.();
+}

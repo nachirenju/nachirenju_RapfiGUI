@@ -25,6 +25,8 @@ export function registerIpcEvents(app) {
                 app.updateGameControlButton();
                 document.querySelector('.analyze-btn').disabled = false;
                 document.getElementById('btnResearch').disabled = false;
+                const btnChallenge = document.getElementById('btnChallenge');
+                if (btnChallenge) btnChallenge.disabled = false;
                 app.statusEl.textContent = "AI準備完了！";
             });
 
@@ -56,6 +58,8 @@ export function registerIpcEvents(app) {
                 document.getElementById('notationDisplay').readOnly = true;
                 app.updateTakebackButton();
                 app.updateGameControlButton();
+                const cec = document.getElementById('challengeEndControls');
+                if (cec) cec.style.display = 'none';
             });
 
            window.electronAPI.onMove((data) => {
@@ -174,6 +178,15 @@ export function registerIpcEvents(app) {
                 document.querySelector('#rapfiTimerBox .timer-label').textContent = "Rapfi";
                 app.updateGameControlButton();
 
+                if (app.challengeMode) {
+                    const cec = document.getElementById('challengeEndControls');
+                    if (cec) cec.style.display = 'flex';
+                    
+                    if (data.reason !== 'manual' && data.reason !== 'draw' && data.winner !== 'Rapfi') {
+                        app.markChallengeSolved(app.currentChallenge.challengeId);
+                    }
+                }
+
                 if (data.reason === 'timeout') {
                     //  音を鳴らしてからアラートを出す
                     app.playSound('timeout');
@@ -212,6 +225,11 @@ export function registerIpcEvents(app) {
             window.electronAPI.onLoadRecordData((data) => {
                 app.closeLoadModal();
                 app.gameActive = false; app.reviewMode = true; app.activeSide = null;
+                app.challengeMode = false;
+                const cec = document.getElementById('challengeEndControls');
+                if (cec) cec.style.display = 'none';
+                const clbl = document.getElementById('challengeLabel');
+                if (clbl) clbl.style.display = 'none';
                 app.statusEl.textContent = "過去の棋譜をロードしました";
                 app.fullGameHistory = data.moves;
                 app.currentRecordId = data.id; 

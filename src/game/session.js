@@ -212,3 +212,69 @@ export async function takebackPlayerMove(ctx, reason = "player takeback") {
 export function finishGameSession(ctx) {
     ctx.terminateGame('ManualEnd');
 }
+
+export async function stopAllActiveModesForChallengeSession(ctx) {
+    if (ctx.getAnalyzing()) {
+        ctx.setAnalyzing(false);
+        ctx.stopAnalysisSession();
+    }
+    
+    ctx.setResearchMode(false);
+    
+    if (ctx.getGameRunning()) {
+        stopGameTimers(ctx);
+        ctx.setGameRunning(false);
+        ctx.setGameEnded(true);
+    }
+    
+    // Use ensureIdle instead of discard to avoid iOS WebAssembly OOM crashes from rapidly respawning workers.
+    await ctx.engineRuntime.ensureIdle();
+}
+
+export async function startChallengeGameSession(ctx, data) {
+    const DEBUG_MODE = true; // Temporary flag for console logic if needed
+    if (DEBUG_MODE) console.log("\x1b[33m[SYSTEM] 挑戦対局開始\x1b[0m");
+
+    stopGameTimers(ctx);
+    ctx.setPlayerTimer(null);
+    ctx.setRapfiTimer(null);
+    ctx.setIntentionalKill(false);
+    ctx.setGameRunning(false);
+    ctx.setGameEnded(false);
+    ctx.setRapfiThinking(false);
+    ctx.setCrashRetryCount(0);
+    ctx.setAnalyzing(false);
+    SearchState.resetSearchState({ resetEval: true });
+    ctx.setResearchMode(false);
+
+    // Apply settings
+    applyGameSettingsForStart(ctx, data);
+    
+    // Challenge-specific color overrides
+    if (data.playerColor) {
+        ctx.setGlobalPlayerColor(data.playerColor);
+        ctx.setAiColorGlobal(data.playerColor === 1 ? 2 : 1);
+        ctx.setAiVsAi(false);
+    }
+
+    createGameTimers(ctx, data);
+
+    const ready = await ctx.engineRuntime.ensureReady();
+    if (!ready) {
+        ctx.broadcastLog('[ERROR] Engine did not become ready before challenge start.');
+        throw new Error('Engine ready timeout');
+    }
+
+    await ctx.initializeGameSession();
+    
+    // History is NOT cleared via clearGameHistory() because UI already deep copied it. 
+    // We just set it. Wait, the history in GameState must be synced!
+    GameState.clearGameHistory();
+    applyInitialStones(data.initialStones || []);
+
+    ctx.setGameRunning(true);
+    
+    const nextTurn = GameState.getNextColor();
+    // For challenge mode, user starts.
+    startInitialTurn(ctx, data, nextTurn);
+}

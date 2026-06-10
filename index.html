@@ -1021,7 +1021,8 @@ body {
                     
                 </div>
             </details>
-            <div class="timer-container board-timer-container">
+            <div class="timer-container board-timer-container" style="align-items: center;">
+                    <div id="challengeLabel" style="display:none; background:#e83e8c; color:white; padding:4px 12px; border-radius:12px; font-weight:bold; font-size:14px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); white-space: nowrap;"></div>
                     <div id="playerTimerBox" class="timer-box">
                         <div class="timer-label">あなた</div>
                         <div id="playerTime" class="timer-val t-player">--:--</div>
@@ -1051,12 +1052,17 @@ body {
                     <button class="btn btn-secondary" onclick="app.exportRenjuPortalUrl()">Portal</button>
                     </div>
                     <div class="nav-row nav-row-actions">
+                        <button id="btnChallenge" class="nav-btn action-btn analyze-action" style="background:#e83e8c; border-color:#d3337e;" onclick="app.openChallengeModal()" disabled>挑戦</button>
                         <button id="btnStart" class="nav-btn action-btn start-action" onclick="app.handleGameControl()" disabled>対局開始</button>
                         <button id="btnResearch" class="nav-btn action-btn research-action" onclick="app.toggleResearchMode()" disabled>研究</button>
                         <button class="nav-btn action-btn pv-action" onclick="app.togglePvWindow()">読み筋</button>
                         <button class="nav-btn action-btn analyze-action analyze-btn" onclick="app.startAnalysis()" disabled>解析</button>
                         <button id="btnTakeback" class="nav-btn action-btn takeback-action" onclick="app.takebackMove()" disabled>待った</button>
                         <button class="nav-btn action-btn icon-btn settings-action" onclick="app.openEngineSettings()" aria-label="詳細設定" title="詳細設定">⚙</button>
+                    </div>
+                    <div id="challengeEndControls" class="nav-row nav-row-actions" style="display:none; margin-top:5px; gap:5px;">
+                        <button class="nav-btn action-btn" style="background:#28a745; border-color:#28a745; color:white; flex:1;" onclick="app.retryChallenge()" data-i18n="もう一度">もう一度</button>
+                        <button class="nav-btn action-btn" style="background:#007bff; border-color:#007bff; color:white; flex:1;" onclick="app.nextChallenge()" data-i18n="次の問題">次の問題</button>
                     </div>
                 </div>
             </div>
@@ -1222,6 +1228,8 @@ body {
         </div>
         <div id="pv-content">
             </div>
+
+    </div>
         <div class="g-resizer g-resizer-t"></div>
         <div class="g-resizer g-resizer-r"></div>
         <div class="g-resizer g-resizer-tr"></div>
@@ -1462,6 +1470,52 @@ body {
             </div>
         </div>
     </div>
-<script type="module" src="/src/gui/main.js"></script>
+        <!-- Score Graph Modal -->
+        <div id="graphModal" class="modal">
+            <div class="modal-content" style="max-width: 600px; max-height: 80vh;">
+                <div class="modal-header">Evaluation Graph</div>
+                <div style="flex: 1; position: relative; width: 100%; min-height: 250px;">
+                    <canvas id="scoreGraphCanvas"></canvas>
+                </div>
+                <div class="modal-footer">
+                    <button class="modal-btn btn-cancel" onclick="app.closeGraphModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Challenge Modal -->
+        <div id="challengeModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header" data-i18n="挑戦">挑戦</div>
+                <div style="font-size:12px; color:var(--text-main); padding:5px 15px 0 15px; margin-bottom:5px;" data-i18n="公式戦でRapfiが見つけたMateの局面、勝ってる側を持って挑戦するモードです。">
+                    公式戦でRapfiが見つけたMateの局面、勝ってる側を持って挑戦するモードです。
+                </div>
+                <div style="font-size:12px; color:var(--text-muted); padding:0 15px 5px 15px; border-bottom:1px solid var(--border-color);" data-i18n="※現在の詳細設定のルールが適用されます">
+                    ※現在の詳細設定のルールが適用されます
+                </div>
+                <div style="padding: 10px 15px; display: flex; gap: 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; font-size: 13px;">
+                    <div>
+                        <label data-i18n="手番:">手番:</label>
+                        <select id="challengeFilterColor" onchange="app.saveChallengeFilter(); app.renderChallengeList()">
+                            <option value="all" data-i18n="すべて">すべて</option>
+                            <option value="1" data-i18n="黒番から">黒番から</option>
+                            <option value="2" data-i18n="白番から">白番から</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label data-i18n="M値:">M値:</label>
+                        <input type="number" id="challengeFilterMMin" value="" min="1" placeholder="Min" style="width:50px; padding:2px; font-size:13px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-primary); color:var(--text-main);" onchange="app.saveChallengeFilter(); app.renderChallengeList()">
+                        <span style="color:var(--text-muted); margin:0 2px;">〜</span>
+                        <input type="number" id="challengeFilterMMax" value="" min="1" placeholder="Max" style="width:50px; padding:2px; font-size:13px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-primary); color:var(--text-main);" onchange="app.saveChallengeFilter(); app.renderChallengeList()">
+                    </div>
+                </div>
+                <ul id="challengeListDisplay" class="modal-list"></ul>
+                <div class="modal-footer">
+                    <button class="modal-btn btn-cancel" onclick="app.closeChallengeModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
+    <script type="module" src="/src/gui/main.js"></script>
 </body>
 </html>
