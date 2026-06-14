@@ -43,6 +43,7 @@ export function installDefaultEngineSettings(app) {
         document.getElementById('analyzeTime').value = 5;
         document.getElementById('analyzeNBest').value = 3;
         document.getElementById('analyzeThreads').value = 4;
+        app.setChallengeHideSolved(true);
         app.applyIOSThreadLimit();
     };
 }

@@ -51,10 +51,14 @@ export function installSettingsExtraMethods(proto) {
             buttons.forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             
-            document.getElementById('tab-' + tabName).classList.add('active');
-            if (tabName === 'engine') buttons[0].classList.add('active');
-            else if (tabName === 'analysis') buttons[1].classList.add('active');
-            else if (tabName === 'ui') buttons[2].classList.add('active');
+            const tab = document.getElementById('tab-' + tabName);
+            if (tab) tab.classList.add('active');
+
+            const tabNames = ['engine', 'analysis', 'challenge', 'ui'];
+            const buttonIndex = tabNames.indexOf(tabName);
+            if (buttonIndex !== -1 && buttons[buttonIndex]) {
+                buttons[buttonIndex].classList.add('active');
+            }
         
     };
 }

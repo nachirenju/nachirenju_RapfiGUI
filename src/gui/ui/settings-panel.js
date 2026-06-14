@@ -100,6 +100,7 @@ export function installSettingsMethods(proto) {
             anaNBest: document.getElementById('analyzeNBest').value,
             anaThreads: document.getElementById('analyzeThreads').value,
             anaHashSize: document.getElementById('analyzeHashSize').value,
+            challengeSkipSolved: document.getElementById('challengeSkipSolved')?.checked ?? true,
             uiBoardColor: document.getElementById('uiBoardColor').value,
             uiMoveSound: document.getElementById('uiMoveSound').checked,
             uiTimeSound: document.getElementById('uiTimeSound').checked,
@@ -143,6 +144,9 @@ export function installSettingsMethods(proto) {
                 if (c.anaNBest !== undefined) document.getElementById('analyzeNBest').value = c.anaNBest;
                 if (c.anaThreads !== undefined) document.getElementById('analyzeThreads').value = c.anaThreads;
                 if (c.anaHashSize !== undefined) document.getElementById('analyzeHashSize').value = c.anaHashSize;
+                if (c.challengeSkipSolved !== undefined) {
+                    this.setChallengeHideSolved(c.challengeSkipSolved);
+                }
                 if (c.uiBoardColor !== undefined) {
                     let boardColor = c.uiBoardColor;
                     if (boardColor === "#F9EBCF") boardColor = "#F2E2BF";

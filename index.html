@@ -1022,7 +1022,7 @@ body {
                 </div>
             </details>
             <div class="timer-container board-timer-container" style="align-items: center;">
-                    <div id="challengeLabel" style="display:none; background:#e83e8c; color:white; padding:4px 12px; border-radius:12px; font-weight:bold; font-size:14px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); white-space: nowrap;"></div>
+                    <div id="challengeLabel" style="display:none; background:#e83e8c; color:white; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:14px; line-height:1.35; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>
                     <div id="playerTimerBox" class="timer-box">
                         <div class="timer-label">あなた</div>
                         <div id="playerTime" class="timer-val t-player">--:--</div>
@@ -1257,6 +1257,7 @@ body {
             <div class="tab-header">
                 <button class="tab-btn active" onclick="app.switchTab('engine')">対局 (Engine)</button>
                 <button class="tab-btn" onclick="app.switchTab('analysis')">解析 (Analysis)</button>
+                <button class="tab-btn" onclick="app.switchTab('challenge')" data-i18n="挑戦">挑戦</button>
                 <button class="tab-btn" onclick="app.switchTab('ui')">UI</button>
             </div>
             
@@ -1351,6 +1352,18 @@ body {
                     <div class="row">
                         <label>ハッシュサイズ(KB)</label>
                         <div><input type="number" id="analyzeHashSize" value="17000" step="1024" style="width:80px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-challenge" class="tab-content">
+                <div class="controls" style="box-shadow:none; padding:0; background:transparent;">
+                    <div style="margin-bottom:15px; font-size:12px; color:#666;" data-i18n="挑戦モードの問題遷移に関する設定です。">
+                        挑戦モードの問題遷移に関する設定です。
+                    </div>
+                    <div class="row">
+                        <label for="challengeSkipSolved" style="cursor:pointer;" data-i18n="「次の問題」でクリア済み問題をスキップする">「次の問題」でクリア済み問題をスキップする</label>
+                        <div><input type="checkbox" id="challengeSkipSolved" checked onchange="app.setChallengeHideSolved(this.checked); app.saveChallengeFilter()"></div>
                     </div>
                 </div>
             </div>
@@ -1493,10 +1506,10 @@ body {
                 <div style="font-size:12px; color:var(--text-muted); padding:0 15px 5px 15px; border-bottom:1px solid var(--border-color);" data-i18n="※現在の詳細設定のルールが適用されます">
                     ※現在の詳細設定のルールが適用されます
                 </div>
-                <div style="padding: 10px 15px; display: flex; gap: 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; font-size: 13px;">
+                <div style="padding: 10px 15px; display: flex; gap: 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; font-size: 13px; flex-wrap: wrap;">
                     <div>
                         <label data-i18n="手番:">手番:</label>
-                        <select id="challengeFilterColor" onchange="app.saveChallengeFilter(); app.renderChallengeList()">
+                        <select id="challengeFilterColor" onchange="if(document.getElementById('challengePageSelect')) document.getElementById('challengePageSelect').value='1'; app.saveChallengeFilter(); app.renderChallengeList()">
                             <option value="all" data-i18n="すべて">すべて</option>
                             <option value="1" data-i18n="黒番から">黒番から</option>
                             <option value="2" data-i18n="白番から">白番から</option>
@@ -1504,10 +1517,20 @@ body {
                     </div>
                     <div>
                         <label data-i18n="M値:">M値:</label>
-                        <input type="number" id="challengeFilterMMin" value="" min="1" placeholder="Min" style="width:50px; padding:2px; font-size:13px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-primary); color:var(--text-main);" onchange="app.saveChallengeFilter(); app.renderChallengeList()">
+                        <input type="number" id="challengeFilterMMin" value="" min="1" placeholder="Min" style="width:50px; padding:2px; font-size:13px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-primary); color:var(--text-main);" onchange="if(document.getElementById('challengePageSelect')) document.getElementById('challengePageSelect').value='1'; app.saveChallengeFilter(); app.renderChallengeList()">
                         <span style="color:var(--text-muted); margin:0 2px;">〜</span>
-                        <input type="number" id="challengeFilterMMax" value="" min="1" placeholder="Max" style="width:50px; padding:2px; font-size:13px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-primary); color:var(--text-main);" onchange="app.saveChallengeFilter(); app.renderChallengeList()">
+                        <input type="number" id="challengeFilterMMax" value="" min="1" placeholder="Max" style="width:50px; padding:2px; font-size:13px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-primary); color:var(--text-main);" onchange="if(document.getElementById('challengePageSelect')) document.getElementById('challengePageSelect').value='1'; app.saveChallengeFilter(); app.renderChallengeList()">
                     </div>
+                    <div>
+                        <label data-i18n="表示:">表示:</label>
+                        <select id="challengePageSelect" onchange="app.saveChallengeFilter(); app.renderChallengeList()">
+                            <option value="1">1〜100問</option>
+                        </select>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="checkbox" id="challengeHideSolved" checked onchange="if(document.getElementById('challengePageSelect')) document.getElementById('challengePageSelect').value='1'; app.setChallengeHideSolved(this.checked); app.saveChallengeFilter(); app.renderChallengeList()">
+                        <span data-i18n="クリアした問題をリストから非表示">クリアした問題をリストから非表示</span>
+                    </label>
                 </div>
                 <ul id="challengeListDisplay" class="modal-list"></ul>
                 <div class="modal-footer">
