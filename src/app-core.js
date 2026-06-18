@@ -165,6 +165,8 @@ function sendToEngine(cmd) {
 let gameActionTimer = null;
 let gameActionSeq = 0;
 let lastGameActionTime = 0;
+let gameOperationChain = Promise.resolve();
+let takebackInProgress = false;
 
 // 詳細設定及び対局状態管理
 let isGameRunning = false;
@@ -779,7 +781,8 @@ function createGameSessionContext() {
         setCrashRetryCount: (value) => { crashRetryCount = value; },
         getAnalyzing: () => isAnalysisRunning(),
         setAnalyzing: setAnalysisRunning,
-        setResearchMode: (value) => { isResearchMode = value; }
+        setResearchMode: (value) => { isResearchMode = value; },
+        stopResearchSession: () => ResearchSessionState.stopResearchSession()
     };
 }
 
@@ -792,6 +795,7 @@ function createAnalysisContext() {
         finishThinkDebug,
         delay,
         setResearchMode: (value) => { isResearchMode = value; },
+        stopResearchSession: () => ResearchSessionState.stopResearchSession(),
         setGameRunning: (value) => { isGameRunning = value; },
         setAnalyzing: setAnalysisRunning
     };
@@ -876,6 +880,13 @@ window.backendAPI_update_engine_setting = function(data) {
 
 window.backendAPI_load_game_record = function(recordId) {
     try {
+        if (isAnalysisRunning()) {
+            stopAnalysisSession({ stopEngine: true });
+        }
+        if (isResearchMode) {
+            isResearchMode = false;
+            stopResearchModeSession();
+        }
         const target = findGameRecordById(recordId);
         if (target) {
             console.log(`Loading record: ${target.title}`);
@@ -942,18 +953,34 @@ window.backendAPI_research_sync = async function(history, nbest, threads, hashSi
 // プレイヤー着手処理
 // --- 【修正③】async 関数に変更 ---
 window.backendAPI_player_move = async function(move) {
-    await handleGamePlayerMove(createGameSessionContext(), move);
+    await enqueueGameOperation(() => handleGamePlayerMove(createGameSessionContext(), move));
 };
 
 
 async function takebackPlayerMove(reason = "player takeback") {
-    return takebackGamePlayerMove(createGameSessionContext(), reason);
+    if (takebackInProgress) return false;
+    takebackInProgress = true;
+    try {
+        return await takebackGamePlayerMove(createGameSessionContext(), reason);
+    } finally {
+        takebackInProgress = false;
+    }
+}
+
+function enqueueGameOperation(operation) {
+    gameOperationChain = gameOperationChain
+        .catch(() => {})
+        .then(operation);
+    return gameOperationChain;
 }
 
 
 window.backendAPI_undo_move = function() {
     if (isGameRunning && !gameEnded && !isAiVsAi) {
-        takebackPlayerMove("game undo");
+        enqueueGameOperation(async () => {
+            const ok = await takebackPlayerMove("game undo");
+            if (!ok) sendToRenderer('undo_result', { moveHistory: GameState.getMoveHistory(), takeback: false });
+        });
         return;
     }
 
@@ -1013,7 +1040,10 @@ window.backendAPI_undo_move = function() {
 };
 
 window.backendAPI_takeback_move = async function() {
-    await takebackPlayerMove("player takeback");
+    await enqueueGameOperation(async () => {
+        const ok = await takebackPlayerMove("player takeback");
+        if (!ok) sendToRenderer('undo_result', { moveHistory: GameState.getMoveHistory(), takeback: false });
+    });
 };
 
 window.backendAPI_start_challenge_game = async function(data) {

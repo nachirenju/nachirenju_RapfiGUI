@@ -24,6 +24,7 @@ export function initializeAppState(app) {
     app.isIOSDevice = app.detectIOSDevice();
     app.hasPlayedOnce = false;
     app.isResearchMode = false;
+    app.analysisModeActive = false;
     app.researchCandidates = {};
     app.currentResearchDepth = 0;
 
@@ -34,6 +35,8 @@ export function initializeAppState(app) {
     app.gameActive = false;
     app.reviewMode = true;
     app.isPlayerTurn = false;
+    app.takebackPending = false;
+    app.takebackPendingTimer = null;
     app.activeSide = null;
     app.timers = { player: 0, rapfi: 0 };
 

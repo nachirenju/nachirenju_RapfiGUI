@@ -37,6 +37,7 @@ export function installSettingsMethods(proto) {
         const timeSound = document.getElementById('uiTimeSound');
         const boardCoords = document.getElementById('uiBoardCoords');
         const stoneShading = document.getElementById('uiStoneShading');
+        const timerOnSide = document.getElementById('uiTimerOnSide');
 
         if (moveSound) this.enableMoveSound = moveSound.checked;
         if (timeSound) this.enableTimeSound = timeSound.checked;
@@ -47,10 +48,24 @@ export function installSettingsMethods(proto) {
 
         this.showBoardCoordinates = nextBoardCoords;
         this.useStoneShading = nextStoneShading;
+        this.updateTimerDisplayPosition(timerOnSide?.checked ?? false);
 
         if (shouldRedrawBoard) {
             this.initBackground();
             this.drawBoard();
+        }
+    };
+
+    proto.updateTimerDisplayPosition = function(moveToSide) {
+        const sideInfoGroup = document.getElementById('gameSideInfoGroup');
+        const boardHome = document.getElementById('boardInfoHome');
+        const sideHost = document.getElementById('sideBoardInfoHost');
+        if (!sideInfoGroup || !boardHome || !sideHost) return;
+
+        const useSide = moveToSide && window.matchMedia('(min-width: 920px)').matches;
+        const destination = useSide ? sideHost : boardHome;
+        if (sideInfoGroup.parentElement !== destination) {
+            destination.appendChild(sideInfoGroup);
         }
     };
 
@@ -106,6 +121,7 @@ export function installSettingsMethods(proto) {
             uiTimeSound: document.getElementById('uiTimeSound').checked,
             uiBoardCoords: document.getElementById('uiBoardCoords').checked,
             uiStoneShading: document.getElementById('uiStoneShading').checked,
+            uiTimerOnSide: document.getElementById('uiTimerOnSide')?.checked ?? false,
             debugMode: document.getElementById('debugModeToggle') ? document.getElementById('debugModeToggle').checked : false
         };
         localStorage.setItem('rapfi_web_config', JSON.stringify(config));
@@ -157,6 +173,7 @@ export function installSettingsMethods(proto) {
                 if (c.uiTimeSound !== undefined) document.getElementById('uiTimeSound').checked = c.uiTimeSound;
                 if (c.uiBoardCoords !== undefined) document.getElementById('uiBoardCoords').checked = c.uiBoardCoords;
                 if (c.uiStoneShading !== undefined) document.getElementById('uiStoneShading').checked = c.uiStoneShading;
+                if (c.uiTimerOnSide !== undefined) document.getElementById('uiTimerOnSide').checked = c.uiTimerOnSide;
                 if (c.debugMode !== undefined) {
                     const toggle = document.getElementById('debugModeToggle');
                     if (toggle) {

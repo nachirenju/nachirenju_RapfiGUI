@@ -160,7 +160,14 @@ export function installModalMethods(proto) {
         
     };
 
-    proto.openSelectedRecord = function() { if (!this.selectedRecordId) { alert("選択してください"); return; } backendCommands.loadGameRecord(this.selectedRecordId); 
+    proto.openSelectedRecord = function() {
+            if (!this.selectedRecordId) { alert("選択してください"); return; }
+            this.stopAnalysisModeUi();
+            if (this.isResearchMode) {
+                this.stopResearchModeUi();
+            }
+            this.clearChallengeModeUi();
+            backendCommands.loadGameRecord(this.selectedRecordId);
     };
 
     proto.deleteSelectedRecord = function() { if (!this.selectedRecordId) { alert("選択してください"); return; } if (confirm("本当に削除しますか？")) { backendCommands.deleteGameRecord(this.selectedRecordId); this.selectedRecordId = null; } 

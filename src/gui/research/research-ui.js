@@ -333,41 +333,53 @@ export function installResearchMethods(proto) {
 
     proto.toggleResearchMode = function() {
     if (this.gameActive) { alert("対局中は切り替えられません"); return; }
-    
-    this.isResearchMode = !this.isResearchMode;
-    this.clearRealtimeEval();
-    const btn = document.getElementById('btnResearch');
-    
-    if (this.isResearchMode) {
-        btn.classList.add('active');
-        btn.textContent = "計算停止";
-        this.statusEl.textContent = "研究モード: 盤面をクリックして進行 / AI解析中...";
-        this.researchCandidates = {}; // リセット
-        document.getElementById('pv-content').innerHTML = ''; // 読み筋プレビューをクリア
 
-        this.setGraphVisibility(true);
-        this.researchEvals = [];
-        this.requestUpdateGraph();
-        
-        // Mainプロセスへ通知
-       if (backendCommands.hasBackendApi()) {
-                    
-                    backendCommands.toggleResearch(true, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
-                    
-                    // 同期時も渡す
-                    backendCommands.researchSync(this.moveHistory, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
-                }
-    } else {
-        btn.classList.remove('active');
-        btn.textContent = "研究モード";
-        this.statusEl.textContent = "検討モード";
-        this.researchCandidates = {};
-        document.getElementById('pv-content').innerHTML = ''; // 読み筋プレビューをクリア
-        this.drawBoard();
-        
-        // Mainプロセスへ通知
-        if (backendCommands.hasBackendApi()) backendCommands.toggleResearch(false);
+    if (this.isResearchMode) {
+        this.stopResearchModeUi();
+        return;
     }
 
+    this.stopAnalysisModeUi();
+    this.clearChallengeModeUi();
+    this.isResearchMode = true;
+    this.clearRealtimeEval();
+    const btn = document.getElementById('btnResearch');
+
+    if (btn) {
+        btn.classList.add('active');
+        btn.textContent = "計算停止";
+    }
+    this.statusEl.textContent = "研究モード: 盤面をクリックして進行 / AI解析中...";
+    this.researchCandidates = {};
+    document.getElementById('pv-content').innerHTML = '';
+
+    this.setGraphVisibility(true);
+    this.researchEvals = [];
+    this.requestUpdateGraph();
+
+    if (backendCommands.hasBackendApi()) {
+        backendCommands.toggleResearch(true, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
+        backendCommands.researchSync(this.moveHistory, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
+    }
+    };
+
+    proto.stopResearchModeUi = function({ notifyBackend = true, updateStatus = true } = {}) {
+        this.isResearchMode = false;
+        this.clearRealtimeEval();
+        const btn = document.getElementById('btnResearch');
+        if (btn) {
+            btn.classList.remove('active');
+            btn.textContent = "研究モード";
+        }
+        if (updateStatus) this.statusEl.textContent = "検討モード";
+        this.researchCandidates = {};
+        this.currentResearchDepth = 0;
+        const pvContent = document.getElementById('pv-content');
+        if (pvContent) pvContent.innerHTML = '';
+        this.drawBoard();
+
+        if (notifyBackend && backendCommands.hasBackendApi()) {
+            backendCommands.toggleResearch(false);
+        }
     };
 }

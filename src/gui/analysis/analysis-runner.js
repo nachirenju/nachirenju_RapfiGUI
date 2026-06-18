@@ -12,7 +12,14 @@
 import * as backendCommands from '../ipc/backend-commands.js';
 
 export function installAnalysisRunnerMethods(proto) {
+    proto.stopAnalysisModeUi = function() {
+        this.analysisModeActive = false;
+        const progress = document.getElementById('progressWrapper');
+        if (progress) progress.style.display = 'none';
+    };
+
     proto.startAnalysis = function() {
+            if (this.gameActive) return;
             if (!this.moveHistory || this.moveHistory.length === 0) return;
             const targetMoves = [...this.moveHistory];
             const startMoveInput = document.getElementById('analyzeStartMove').value;
@@ -25,6 +32,11 @@ export function installAnalysisRunnerMethods(proto) {
             const hashSize = document.getElementById('analyzeHashSize').value;
 
             if (confirm(`現在の局面まで(${targetMoves.length}手)を解析します。\n${startMove}手目から開始。\n1手につき ${timeSeconds}秒 かかります。`)) {
+                if (this.isResearchMode) {
+                    this.stopResearchModeUi();
+                }
+                this.clearChallengeModeUi();
+                this.analysisModeActive = true;
                 this.setGraphVisibility(false);
                 this.statsContainer.style.display = 'none';
                 document.getElementById('progressWrapper').style.display = 'block';

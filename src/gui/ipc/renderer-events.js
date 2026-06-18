@@ -33,6 +33,15 @@ export function registerIpcEvents(app) {
             if (!window.electronAPI) return;
 
             window.electronAPI.onGameStarted((data) => {
+                app.takebackPending = false;
+                if (app.takebackPendingTimer) {
+                    clearTimeout(app.takebackPendingTimer);
+                    app.takebackPendingTimer = null;
+                }
+                app.stopAnalysisModeUi();
+                if (app.isResearchMode) {
+                    app.stopResearchModeUi({ notifyBackend: false, updateStatus: false });
+                }
                 app.gameActive = true; app.reviewMode = false;
                 app.activeSide = (data.turn === 'player') ? 'player' : 'rapfi';
                 app.isPlayerTurn = (data.turn === 'player');
@@ -60,9 +69,12 @@ export function registerIpcEvents(app) {
                 app.updateGameControlButton();
                 const cec = document.getElementById('challengeEndControls');
                 if (cec) cec.style.display = 'none';
+                const skipBtn = document.getElementById('btnSkipChallenge');
+                if (skipBtn) skipBtn.style.display = app.challengeMode ? 'inline-block' : 'none';
             });
 
-           window.electronAPI.onMove((data) => {
+            window.electronAPI.onMove((data) => {
+                if (app.takebackPending) return;
                 if (app.board[data.y][data.x] !== EMPTY) {
                     // ここはAI思考中のクリック防止用なので、AI vs AIではあまり関係ないが維持
                     if (app.gameActive && !app.isAiVsAi()) { 
@@ -114,6 +126,11 @@ export function registerIpcEvents(app) {
             });
 
             window.electronAPI.onUndoResult((data) => {
+                app.takebackPending = false;
+                if (app.takebackPendingTimer) {
+                    clearTimeout(app.takebackPendingTimer);
+                    app.takebackPendingTimer = null;
+                }
                 app.moveHistory = data.moveHistory;
                 app.resetBoardTo(app.moveHistory);
                 app.fullGameHistory = [...app.moveHistory];
@@ -166,6 +183,11 @@ export function registerIpcEvents(app) {
 
             // 対局終了イベント
             window.electronAPI.onGameOver((data) => {
+                app.takebackPending = false;
+                if (app.takebackPendingTimer) {
+                    clearTimeout(app.takebackPendingTimer);
+                    app.takebackPendingTimer = null;
+                }
                 app.gameActive = false; 
                 app.setGraphVisibility(true);
                 app.reviewMode = true; 
@@ -179,6 +201,8 @@ export function registerIpcEvents(app) {
                 app.updateGameControlButton();
 
                 if (app.challengeMode) {
+                    const skipBtn = document.getElementById('btnSkipChallenge');
+                    if (skipBtn) skipBtn.style.display = 'none';
                     const cec = document.getElementById('challengeEndControls');
                     if (cec) cec.style.display = 'flex';
                     
@@ -224,12 +248,12 @@ export function registerIpcEvents(app) {
 
             window.electronAPI.onLoadRecordData((data) => {
                 app.closeLoadModal();
+                app.stopAnalysisModeUi();
+                if (app.isResearchMode) {
+                    app.stopResearchModeUi({ notifyBackend: false, updateStatus: false });
+                }
                 app.gameActive = false; app.reviewMode = true; app.activeSide = null;
-                app.challengeMode = false;
-                const cec = document.getElementById('challengeEndControls');
-                if (cec) cec.style.display = 'none';
-                const clbl = document.getElementById('challengeLabel');
-                if (clbl) clbl.style.display = 'none';
+                app.clearChallengeModeUi();
                 app.statusEl.textContent = "過去の棋譜をロードしました";
                 app.fullGameHistory = data.moves;
                 app.currentRecordId = data.id; 
@@ -245,6 +269,7 @@ export function registerIpcEvents(app) {
             });
 
             window.electronAPI.onAnalysisProgress((data) => {
+                if (!app.analysisModeActive) return;
                 console.log(`進捗受信: ${data.current}/${data.total} (Score: ${data.score})`);
                 document.getElementById('progressWrapper').style.display = 'block';
                 document.getElementById('analyzeProgress').max = data.total;
@@ -260,6 +285,8 @@ export function registerIpcEvents(app) {
             });
 
             window.electronAPI.onAnalysisComplete((results) => {
+                if (!app.analysisModeActive) return;
+                app.analysisModeActive = false;
                 alert("解析が完了しました。");
                 document.getElementById('progressWrapper').style.display = 'none';
                 app.lastAnalysisResults = results;
@@ -271,6 +298,7 @@ export function registerIpcEvents(app) {
                 }
             });
         window.electronAPI.onResearchUpdate((data) => {
+                if (!app.isResearchMode || app.gameActive || app.analysisModeActive) return;
                 // data = { rank, depth, x, y, score, turnColor }
 
                 if (app.board[data.y][data.x] !== EMPTY) {

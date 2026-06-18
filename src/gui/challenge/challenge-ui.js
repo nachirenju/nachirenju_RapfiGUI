@@ -144,6 +144,7 @@ export function installChallengeMethods(proto) {
         const filterColor = document.getElementById('challengeFilterColor')?.value || 'all';
         const minVal = document.getElementById('challengeFilterMMin')?.value;
         const maxVal = document.getElementById('challengeFilterMMax')?.value;
+        const filterSkip = document.getElementById('challengeFilterSkip')?.value || 'all';
         const filterMMin = minVal ? parseInt(minVal) : NaN;
         const filterMMax = maxVal ? parseInt(maxVal) : NaN;
         const hideSolved = this.isChallengeHideSolvedEnabled();
@@ -156,6 +157,8 @@ export function installChallengeMethods(proto) {
         let filteredData = this.challengeDataList.filter(item => {
             if (filterColor !== 'all' && item._startColor.toString() !== filterColor) return false;
             if (hideSolved && this.isChallengeSolved(item.challengeId)) return false;
+            if (filterSkip === 'skipped' && !this.isChallengeSkipped(item.challengeId)) return false;
+            if (filterSkip === 'new' && !(this._newChallengeIds && this._newChallengeIds.has(item.challengeId))) return false;
             
             const m = parseInt(item.m_value) || 0;
             if (!isNaN(filterMMin) && m < filterMMin) return false;
@@ -220,10 +223,12 @@ export function installChallengeMethods(proto) {
             const startColorStr = item._startColor === 1 ? this.translateUiText('黒') : this.translateUiText('白');
             const indexStr = `<span style="font-size:18px; font-weight:bold; color:var(--text-main); margin-right:12px; min-width: 30px;">#${item.originalIndex}</span>`;
             const isSolved = this.isChallengeSolved(challengeId);
+            const isSkipped = this.isChallengeSkipped(challengeId);
             const isNew = this._newChallengeIds && this._newChallengeIds.has(challengeId);
             const clearBadge = isSolved ? `<span style="background:#28a745; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle;">Clear!</span>` : '';
+            const skipBadge = isSkipped ? `<span style="background:#6f42c1; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle;">Skip</span>` : '';
             const newBadge = isNew ? `<span style="background:#dc3545; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:3px; margin-left:8px; vertical-align:middle;">NEW</span>` : '';
-            const badgeStr = clearBadge + newBadge;
+            const badgeStr = clearBadge + skipBadge + newBadge;
             const titleStr = `${item.tournament_name || 'Unknown'} - <span style="color:#FF5C7A; font-weight:bold;">M${item.m_value}</span> (${this.translateUiText('手番')}: ${startColorStr})${badgeStr}`;
             const playerStr = `${item.black_name || '?'} vs ${item.white_name || '?'}`;
             
@@ -287,12 +292,25 @@ export function installChallengeMethods(proto) {
         }
     };
 
+    proto.clearChallengeModeUi = function() {
+        this.challengeMode = false;
+        this.currentChallenge = null;
+        this.challengeStartPly = 0;
+        const endControls = document.getElementById('challengeEndControls');
+        if (endControls) endControls.style.display = 'none';
+        const challengeLabel = document.getElementById('challengeLabel');
+        if (challengeLabel) challengeLabel.style.display = 'none';
+        const skipButton = document.getElementById('btnSkipChallenge');
+        if (skipButton) skipButton.style.display = 'none';
+    };
+
     proto.saveChallengeFilter = function() {
         const filters = {
             color: document.getElementById('challengeFilterColor')?.value || 'all',
             mMin: document.getElementById('challengeFilterMMin')?.value || '',
             mMax: document.getElementById('challengeFilterMMax')?.value || '',
             page: document.getElementById('challengePageSelect')?.value || '1',
+            skip: document.getElementById('challengeFilterSkip')?.value || 'all',
             hideSolved: this.isChallengeHideSolvedEnabled()
         };
         localStorage.setItem('rapfi_challenge_filters', JSON.stringify(filters));
@@ -318,6 +336,10 @@ export function installChallengeMethods(proto) {
                 if (filters.page) {
                     const el = document.getElementById('challengePageSelect');
                     if (el) el.value = filters.page;
+                }
+                if (filters.skip) {
+                    const el = document.getElementById('challengeFilterSkip');
+                    if (el) el.value = filters.skip;
                 }
                 if (filters.hideSolved !== undefined) {
                     this.setChallengeHideSolved(filters.hideSolved);
@@ -369,6 +391,26 @@ export function installChallengeMethods(proto) {
         return false;
     };
 
+    proto.markChallengeSkipped = function(challengeId) {
+        try {
+            const saved = localStorage.getItem('rapfi_skipped_challenges');
+            const skipped = saved ? JSON.parse(saved) : {};
+            skipped[challengeId] = true;
+            localStorage.setItem('rapfi_skipped_challenges', JSON.stringify(skipped));
+        } catch(e) {}
+    };
+
+    proto.isChallengeSkipped = function(challengeId) {
+        try {
+            const saved = localStorage.getItem('rapfi_skipped_challenges');
+            if (saved) {
+                const skipped = JSON.parse(saved);
+                return !!skipped[challengeId];
+            }
+        } catch(e) {}
+        return false;
+    };
+
     proto.updateChallengeLabel = function() {
         const challengeLabel = document.getElementById('challengeLabel');
         if (!challengeLabel || !this.currentChallenge) return;
@@ -396,6 +438,13 @@ export function installChallengeMethods(proto) {
             clearMark.style.color = '#d4ffd9';
             problem.appendChild(clearMark);
         }
+        if (this.isChallengeSkipped(this.currentChallenge.challengeId)) {
+            const skipMark = document.createElement('span');
+            skipMark.textContent = ' Skip';
+            skipMark.style.marginLeft = '6px';
+            skipMark.style.color = '#eadcff';
+            problem.appendChild(skipMark);
+        }
         challengeLabel.append(tournament, players, problem);
         challengeLabel.style.display = 'block';
     };
@@ -417,6 +466,14 @@ export function installChallengeMethods(proto) {
         this.inputLocked = true;
 
         try {
+            this.stopAnalysisModeUi();
+            if (this.isResearchMode) {
+                this.stopResearchModeUi({ notifyBackend: false, updateStatus: false });
+            }
+            this.clearRealtimeEval();
+            this.researchCandidates = {};
+            this.currentResearchDepth = 0;
+
             // 1. 安全に停止・非同期破棄
             await backendCommands.stopAllActiveModesForChallenge();
 
@@ -505,14 +562,13 @@ export function installChallengeMethods(proto) {
             this.inputLocked = false;
 
             this.updateChallengeLabel();
+            const skipButton = document.getElementById('btnSkipChallenge');
+            if (skipButton) skipButton.style.display = 'inline-block';
         } catch (error) {
             console.error(error);
-            this.challengeMode = false;
-            this.currentChallenge = null;
+            this.clearChallengeModeUi();
             this.isPlayerTurn = false;
             this.inputLocked = true;
-            const challengeLabel = document.getElementById('challengeLabel');
-            if (challengeLabel) challengeLabel.style.display = 'none';
             alert('挑戦対局の開始に失敗しました。盤面をリセットするか、別の問題を選んでください。');
         }
     };
@@ -544,5 +600,12 @@ export function installChallengeMethods(proto) {
         } else {
             alert(this.translateUiText('最後の問題です。'));
         }
+    };
+
+    proto.skipChallenge = function() {
+        if (!this.challengeMode || !this.currentChallenge) return;
+        this.markChallengeSkipped(this.currentChallenge.challengeId);
+        this.updateChallengeLabel();
+        this.nextChallenge();
     };
 }

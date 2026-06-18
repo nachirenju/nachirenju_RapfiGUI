@@ -33,6 +33,9 @@ export function initializeAppBootstrap(app) {
 
     app.loadConfig();
     app.applyIOSThreadLimit();
+    window.addEventListener('resize', () => {
+        app.updateTimerDisplayPosition(document.getElementById('uiTimerOnSide')?.checked ?? false);
+    });
 
     registerIpcEvents(app);
 

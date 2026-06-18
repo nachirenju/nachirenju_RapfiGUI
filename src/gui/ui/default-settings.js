@@ -35,6 +35,7 @@ export function installDefaultEngineSettings(app) {
         document.getElementById('uiTimeSound').checked = true;
         document.getElementById('uiBoardCoords').checked = true;
         document.getElementById('uiStoneShading').checked = true;
+        document.getElementById('uiTimerOnSide').checked = false;
         app.setBoardColor("#F2E2BF");
         app.applyUiSettings();
         app.updateTimeRuleUi();

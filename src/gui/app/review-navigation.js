@@ -64,11 +64,7 @@ export function installReviewNavigationMethods(proto) {
             if(confirm("盤面をリセットしますか？")) { 
                 this.resetBoard(); 
                 this.fullGameHistory = []; 
-                this.challengeMode = false;
-                const cec = document.getElementById('challengeEndControls');
-                if (cec) cec.style.display = 'none';
-                const clbl = document.getElementById('challengeLabel');
-                if (clbl) clbl.style.display = 'none';
+                this.clearChallengeModeUi();
                 
                 // 研究モードなら空の履歴を同期
              if (this.isResearchMode && backendCommands.hasBackendApi()) {

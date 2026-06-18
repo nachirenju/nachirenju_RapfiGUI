@@ -25,7 +25,8 @@ export function createAnalysisState() {
         queue: [],
         results: [],
         timePerMove: 1000,
-        resolver: null
+        resolver: null,
+        sessionId: 0
     };
 }
 
@@ -60,6 +61,7 @@ export function resolveAnalysisFromBestMove(state) {
 }
 
 export function stopAnalysisSession(state, ctx, { stopEngine = false } = {}) {
+    state.sessionId++;
     clearAnalysisTimeout(state);
     resolveAnalysisResult(state, []);
     state.queue = [];
@@ -91,7 +93,9 @@ function sendAnalysisSetupCommands(ctx, item) {
     ctx.sendToEngine("INFO show_detail 3");
 }
 
-export async function processAnalysisQueue(state, ctx) {
+export async function processAnalysisQueue(state, ctx, sessionId) {
+    if (!state.isAnalyzing || state.sessionId !== sessionId) return;
+
     if (state.queue.length === 0) {
         ctx.trace('SYSTEM', null, 'Analysis Complete');
         clearAnalysisTimeout(state);
@@ -119,11 +123,12 @@ export async function processAnalysisQueue(state, ctx) {
     if (winner) {
         console.log(`[Analysis Skip] position already completed at move ${moveNum}`);
         pushCompletedAnalysisResult(state, ctx, item, winner);
-        processAnalysisQueue(state, ctx);
+        processAnalysisQueue(state, ctx, sessionId);
         return;
     }
 
     await ctx.engineRuntime.ensureIdle();
+    if (!state.isAnalyzing || state.sessionId !== sessionId) return;
 
     if (!ctx.engineRuntime.getIsReady()) {
         ctx.engineRuntime.start();
@@ -162,6 +167,7 @@ export async function processAnalysisQueue(state, ctx) {
             }
         }, timeoutMs);
     });
+    if (!state.isAnalyzing || state.sessionId !== sessionId) return;
 
     const elapsedMs = performance.now() - startTime;
     ctx.trace('FINISH', 0, `Move analysis done in ${elapsedMs.toFixed(0)}ms`);
@@ -215,7 +221,7 @@ export async function processAnalysisQueue(state, ctx) {
 
     state.results.push({ move: moveNum, score: blackViewScore, bestMove, candidates, timeMs: elapsedMs });
     ctx.sendToRenderer('analysis_progress', { current: item.moveNum, total: item.total, score: blackViewScore });
-    processAnalysisQueue(state, ctx);
+    processAnalysisQueue(state, ctx, sessionId);
 }
 
 export function startAnalysisSession(state, ctx, data) {
@@ -225,15 +231,17 @@ export function startAnalysisSession(state, ctx, data) {
     }
 
     ctx.setResearchMode(false);
+    ctx.stopResearchSession();
     ctx.setGameRunning(false);
 
     state.results = [];
     state.queue = createAnalysisQueue(data);
     state.timePerMove = data.timePerMove;
     if (state.queue.length > 0) {
+        const sessionId = ++state.sessionId;
         state.isAnalyzing = true;
         ctx.setAnalyzing(true);
-        processAnalysisQueue(state, ctx);
+        processAnalysisQueue(state, ctx, sessionId);
     } else {
         ctx.setAnalyzing(false);
         ctx.sendToRenderer('analysis_complete', []);

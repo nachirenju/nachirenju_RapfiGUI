@@ -39,6 +39,7 @@ export function installSettingsExtraMethods(proto) {
             document.getElementById('uiTimeSound').checked = true;
             document.getElementById('uiBoardCoords').checked = true;
             document.getElementById('uiStoneShading').checked = true;
+            document.getElementById('uiTimerOnSide').checked = false;
             this.setBoardColor("#F2E2BF");
             this.applyUiSettings();
             this.updateTimeRuleUi();

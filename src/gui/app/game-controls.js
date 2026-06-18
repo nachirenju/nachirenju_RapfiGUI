@@ -19,7 +19,7 @@ export function installGameControlMethods(proto) {
     };
 
     proto.canTakebackMove = function() {
-            if (!this.gameActive || this.isAiVsAi()) return false;
+            if (!this.gameActive || this.isAiVsAi() || this.takebackPending) return false;
             const playerColor = parseInt(document.getElementById('playerColor').value);
             return this.moveHistory.some(move => move.color === playerColor);
         
@@ -136,13 +136,10 @@ export function installGameControlMethods(proto) {
     proto.startGame = function() {
             // 研究モードがONなら強制終了しておく
             if (this.isResearchMode) {
-                this.toggleResearchMode(); 
+                this.stopResearchModeUi();
             }
-            this.challengeMode = false;
-            const cec = document.getElementById('challengeEndControls');
-            if (cec) cec.style.display = 'none';
-            const clbl = document.getElementById('challengeLabel');
-            if (clbl) clbl.style.display = 'none';
+            this.stopAnalysisModeUi();
+            this.clearChallengeModeUi();
             this.clearRealtimeEval();
 
             //二局目以降設定ON時、盤面リセットの確認
@@ -235,6 +232,15 @@ export function installGameControlMethods(proto) {
 
     proto.takebackMove = function() {
             if (!this.canTakebackMove()) return;
+            this.takebackPending = true;
+            this.updateTakebackButton();
+            this.statusEl.textContent = "待った処理中...";
+            if (this.takebackPendingTimer) clearTimeout(this.takebackPendingTimer);
+            this.takebackPendingTimer = setTimeout(() => {
+                this.takebackPending = false;
+                this.takebackPendingTimer = null;
+                this.updateTakebackButton();
+            }, 5000);
             backendCommands.takebackMove();
         
     };

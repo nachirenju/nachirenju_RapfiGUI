@@ -47,6 +47,7 @@ export function resetGameStateForStart(ctx, data) {
     ctx.setAnalyzing(false);
     SearchState.resetSearchState({ resetEval: true });
     ctx.setResearchMode(false);
+    ctx.stopResearchSession();
     ctx.stopAnalysisSession();
 }
 
@@ -188,6 +189,7 @@ export async function takebackPlayerMove(ctx, reason = "player takeback") {
     ctx.bumpGameActionSeq();
     pauseRunningTimer(ctx.getPlayerTimer());
     pauseRunningTimer(ctx.getRapfiTimer());
+    ctx.setRapfiThinking(false);
 
     if (ctx.engineRuntime.getIsBusy()) {
         ctx.sendToEngine("YXSTOP");
@@ -195,7 +197,6 @@ export async function takebackPlayerMove(ctx, reason = "player takeback") {
     }
     SearchState.resetSearchState();
 
-    ctx.setRapfiThinking(false);
     const playerTimer = ctx.getPlayerTimer();
     if (playerTimer) playerTimer.start();
 
@@ -220,6 +221,7 @@ export async function stopAllActiveModesForChallengeSession(ctx) {
     }
     
     ctx.setResearchMode(false);
+    ctx.stopResearchSession();
     
     if (ctx.getGameRunning()) {
         stopGameTimers(ctx);
@@ -246,6 +248,7 @@ export async function startChallengeGameSession(ctx, data) {
     ctx.setAnalyzing(false);
     SearchState.resetSearchState({ resetEval: true });
     ctx.setResearchMode(false);
+    ctx.stopResearchSession();
 
     // Apply settings
     applyGameSettingsForStart(ctx, data);
