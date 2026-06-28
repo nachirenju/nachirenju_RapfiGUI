@@ -350,8 +350,7 @@ export function installResearchMethods(proto) {
         btn.textContent = "計算停止";
     }
     this.statusEl.textContent = "研究モード: 盤面をクリックして進行 / AI解析中...";
-    this.researchCandidates = {};
-    document.getElementById('pv-content').innerHTML = '';
+    this.resetResearchUiForCurrentPosition();
 
     this.setGraphVisibility(true);
     this.researchEvals = [];
@@ -359,7 +358,7 @@ export function installResearchMethods(proto) {
 
     if (backendCommands.hasBackendApi()) {
         backendCommands.toggleResearch(true, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
-        backendCommands.researchSync(this.moveHistory, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
+        this.scheduleResearchSync({ debounceMs: 0 });
     }
     };
 
@@ -374,6 +373,12 @@ export function installResearchMethods(proto) {
         if (updateStatus) this.statusEl.textContent = "検討モード";
         this.researchCandidates = {};
         this.currentResearchDepth = 0;
+        this.researchBoardKey = "";
+        this.researchSyncSeq++;
+        if (this.researchSyncTimer) {
+            clearTimeout(this.researchSyncTimer);
+            this.researchSyncTimer = null;
+        }
         const pvContent = document.getElementById('pv-content');
         if (pvContent) pvContent.innerHTML = '';
         this.drawBoard();

@@ -12,6 +12,32 @@ import { BOARD_SIZE, EMPTY, BLACK, WHITE } from '../board/renju-engine.js';
 import * as backendCommands from '../ipc/backend-commands.js';
 
 export function installGameControlMethods(proto) {
+    proto.getResearchBoardKey = function(history = this.moveHistory) {
+        return (history || []).map(move => `${move.x},${move.y},${move.color}`).join('|');
+    };
+
+    proto.resetResearchUiForCurrentPosition = function() {
+        this.researchCandidates = {};
+        this.currentResearchDepth = 0;
+        this.researchBoardKey = this.getResearchBoardKey();
+        const pvContent = document.getElementById('pv-content');
+        if (pvContent) pvContent.innerHTML = '';
+        this.requestUpdateGraph();
+    };
+
+    proto.scheduleResearchSync = function({ debounceMs = 80 } = {}) {
+        if (!backendCommands.hasBackendApi()) return;
+        const syncSeq = ++this.researchSyncSeq;
+        const historySnapshot = this.moveHistory.map(move => ({ ...move }));
+        this.researchBoardKey = this.getResearchBoardKey(historySnapshot);
+        if (this.researchSyncTimer) clearTimeout(this.researchSyncTimer);
+        this.researchSyncTimer = setTimeout(() => {
+            if (!this.isResearchMode || this.researchSyncSeq !== syncSeq) return;
+            this.researchSyncTimer = null;
+            backendCommands.researchSync(historySnapshot, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
+        }, debounceMs);
+    };
+
     proto.isAiVsAi = function() {
             const val = document.getElementById('playerColor').value;
             return parseInt(val) === 0;
@@ -54,15 +80,10 @@ export function installGameControlMethods(proto) {
                 this.lastMove = {x, y};
                 
                 // UIに表示させる
-                this.researchCandidates = {};
-                this.currentResearchDepth = 0; 
-                this.requestUpdateGraph();
+                this.resetResearchUiForCurrentPosition();
                 this.drawBoard();
                 
-                
-            if (backendCommands.hasBackendApi()) {
-                    backendCommands.researchSync(this.moveHistory, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
-                }
+                this.scheduleResearchSync({ debounceMs: 0 });
                 return;
             }
 
@@ -118,16 +139,11 @@ export function installGameControlMethods(proto) {
                 this.lastMove = this.moveHistory.length > 0 ? this.moveHistory[this.moveHistory.length - 1] : null;
 
                 // 2. 表示のリセット
-                    this.researchCandidates = {};
-                    this.currentResearchDepth = 0;
-                    this.requestUpdateGraph();
-                this.currentResearchDepth = 0;
+                this.resetResearchUiForCurrentPosition();
                 this.drawBoard();
 
                 // 3. エンジンと同期（更新後の履歴を送って再解析させる）
-                if (backendCommands.hasBackendApi()) {
-                    backendCommands.researchSync(this.moveHistory, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
-                }
+                this.scheduleResearchSync({ debounceMs: 120 });
                 return;
             }
             if(this.moveHistory.length > 0) this.takebackMove(); 

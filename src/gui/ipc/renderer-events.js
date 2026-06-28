@@ -299,6 +299,7 @@ export function registerIpcEvents(app) {
             });
         window.electronAPI.onResearchUpdate((data) => {
                 if (!app.isResearchMode || app.gameActive || app.analysisModeActive) return;
+                if (data.boardKey !== undefined && data.boardKey !== app.researchBoardKey) return;
                 // data = { rank, depth, x, y, score, turnColor }
 
                 if (app.board[data.y][data.x] !== EMPTY) {

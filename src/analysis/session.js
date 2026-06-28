@@ -84,6 +84,50 @@ function pushCompletedAnalysisResult(state, ctx, item, winner) {
     ctx.sendToRenderer('analysis_progress', { current: item.moveNum, total: item.total, score: finalScore });
 }
 
+function pushForbiddenBlackStopResult(state, ctx, item, forbidden) {
+    state.results.push({
+        move: item.moveNum,
+        score: -30000,
+        bestMove: null,
+        candidates: [],
+        timeMs: 0,
+        note: `black forbidden stop after white four${forbidden?.type ? `: ${forbidden.type}` : ''}`
+    });
+    ctx.sendToRenderer('analysis_progress', { current: item.moveNum, total: item.total, score: -30000 });
+}
+
+function getImmediateWinningSpots(board, color) {
+    const spots = [];
+    for (let y = 0; y < BOARD_SIZE; y++) {
+        for (let x = 0; x < BOARD_SIZE; x++) {
+            if (board[y][x] !== 0) continue;
+            board[y][x] = color;
+            const win = checkWinOnBoard(board, x, y, color);
+            board[y][x] = 0;
+            if (win) spots.push({ x, y });
+        }
+    }
+    return spots;
+}
+
+function getForbiddenBlackStop(board, x, y) {
+    if (!board[y] || board[y][x] !== 0) return null;
+    board[y][x] = 1;
+    const forbidden = checkForbidden(board, x, y);
+    board[y][x] = 0;
+    return forbidden;
+}
+
+function getForbiddenStopAfterWhiteFour(board, currentTurnColor) {
+    if (currentTurnColor !== 1) return null;
+
+    const whiteWinningSpots = getImmediateWinningSpots(board, 2);
+    if (whiteWinningSpots.length !== 1) return null;
+
+    const stop = whiteWinningSpots[0];
+    return getForbiddenBlackStop(board, stop.x, stop.y);
+}
+
 function sendAnalysisSetupCommands(ctx, item) {
     ctx.sendToEngine("YXSHOWINFO");
     if (item.threads) ctx.sendToEngine(`INFO thread_num ${item.threads}`);
@@ -123,6 +167,14 @@ export async function processAnalysisQueue(state, ctx, sessionId) {
     if (winner) {
         console.log(`[Analysis Skip] position already completed at move ${moveNum}`);
         pushCompletedAnalysisResult(state, ctx, item, winner);
+        processAnalysisQueue(state, ctx, sessionId);
+        return;
+    }
+
+    const forbiddenStop = getForbiddenStopAfterWhiteFour(tempBoard, currentTurnColor);
+    if (forbiddenStop) {
+        console.log(`[Analysis Skip] black stop is forbidden after white four at move ${moveNum}. Score set to -30000.`);
+        pushForbiddenBlackStopResult(state, ctx, item, forbiddenStop);
         processAnalysisQueue(state, ctx, sessionId);
         return;
     }

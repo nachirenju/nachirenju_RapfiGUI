@@ -416,7 +416,8 @@ function processEngineLine(line) {
                 if (DEBUG_MODE) console.log(`[Think DEBUG] non-PV engine status ignored for PV tracking: "${line}"`);
             }
             if (isResearchMode) {
-                const accepted = pvData.moveCoords && ResearchSessionState.isValidResearchSession(undefined, GameState.getBoardKey());
+                const boardKey = ResearchSessionState.getActiveResearchBoardKey();
+                const accepted = pvData.moveCoords && boardKey && ResearchSessionState.isValidResearchSession(undefined, boardKey);
                 if (accepted) {
                     const turnColor = GameState.getNextColor();
                     const blackScore = (turnColor === 2) ? -pvData.score : pvData.score;
@@ -424,7 +425,8 @@ function processEngineLine(line) {
                         rank: pvData.rank, depth: pvData.depth,
                         x: pvData.moveCoords.x, y: pvData.moveCoords.y,
                         score: pvData.score, blackScore: blackScore, rawScore: pvData.score,
-                        turnColor: turnColor, scoreView: "side-to-move", pv: pvData.movesStr
+                        turnColor: turnColor, scoreView: "side-to-move", pv: pvData.movesStr,
+                        boardKey
                     }, (updates) => {
                         for (const data of updates) sendToRenderer('research_update', data);
                     });
@@ -631,7 +633,8 @@ async function startResearchSession(reason = "manual") {
     }
 
     const latestMoves = GameState.applyMoveHistory(GameState.getMoveHistory(), `research:${reason}`);
-    ResearchSessionState.setCurrentResearchBoardKey(createMoveHistoryKey(latestMoves));
+    const latestBoardKey = createMoveHistoryKey(latestMoves);
+    ResearchSessionState.setCurrentResearchBoardKey(latestBoardKey);
     const prepared = await prepareResearchEngine({
         engineRuntime,
         sendToEngine,
@@ -641,6 +644,11 @@ async function startResearchSession(reason = "manual") {
         reason
     });
     if (!prepared) return;
+    if (!isResearchMode || sessionId !== ResearchSessionState.getResearchSessionSeq()) {
+        if (DEBUG_MODE) console.log(`[Research DEBUG #${sessionId}] stale prepared session skipped`);
+        return;
+    }
+    ResearchSessionState.setActiveResearchBoardKey(latestBoardKey);
 
     const researchTimeout = getResearchTimeout({
         supportsThreads: engineRuntime.getSupportsThreads(),

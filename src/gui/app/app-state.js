@@ -27,6 +27,9 @@ export function initializeAppState(app) {
     app.analysisModeActive = false;
     app.researchCandidates = {};
     app.currentResearchDepth = 0;
+    app.researchSyncSeq = 0;
+    app.researchSyncTimer = null;
+    app.researchBoardKey = "";
 
     app.thumbCanvas = document.createElement('canvas');
     app.thumbCanvas.width = 100;

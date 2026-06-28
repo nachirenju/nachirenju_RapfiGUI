@@ -50,11 +50,9 @@ export function installReviewNavigationMethods(proto) {
             
             // 研究モードなら同期
          if (this.isResearchMode && backendCommands.hasBackendApi()) {
-                this.researchCandidates = {}; 
-                this.currentResearchDepth = 0;
-                this.requestUpdateGraph();
+                this.resetResearchUiForCurrentPosition();
                 // 設定値を渡す
-                backendCommands.researchSync(this.moveHistory, this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
+                this.scheduleResearchSync({ debounceMs: 0 });
             }
         
     };
@@ -68,9 +66,8 @@ export function installReviewNavigationMethods(proto) {
                 
                 // 研究モードなら空の履歴を同期
              if (this.isResearchMode && backendCommands.hasBackendApi()) {
-                    this.researchCandidates = {};
-                    
-                    backendCommands.researchSync([], this.getMultiPVSetting(), this.getThreadSetting(), this.getHashSetting());
+                    this.resetResearchUiForCurrentPosition();
+                    this.scheduleResearchSync({ debounceMs: 0 });
                 }
             } 
         

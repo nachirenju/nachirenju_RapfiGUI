@@ -11,6 +11,7 @@
 let researchSessionSeq = 0;
 let researchActionSeq = 0;
 let currentResearchBoardKey = "";
+let activeResearchBoardKey = "";
 let pendingIOSResearchReason = "";
 let researchUpdateMap = new Map();
 let researchUpdateTimer = null;
@@ -21,6 +22,7 @@ export function getResearchSessionSeq() { return researchSessionSeq; }
 export function getResearchActionSeq() { return researchActionSeq; }
 export function getLastResearchActionTime() { return lastResearchActionTime; }
 export function getCurrentResearchBoardKey() { return currentResearchBoardKey; }
+export function getActiveResearchBoardKey() { return activeResearchBoardKey; }
 export function getPendingIOSResearchReason() { return pendingIOSResearchReason; }
 export function setPendingIOSResearchReason(reason) { pendingIOSResearchReason = reason; }
 export function clearPendingIOSResearchReason() { pendingIOSResearchReason = ""; }
@@ -28,12 +30,21 @@ export function clearPendingIOSResearchReason() { pendingIOSResearchReason = "";
 export function startNewResearchSession(boardKey) {
     researchSessionSeq++;
     currentResearchBoardKey = boardKey;
+    activeResearchBoardKey = "";
     clearResearchUpdates();
     return researchSessionSeq;
 }
 
 export function setCurrentResearchBoardKey(boardKey) {
     currentResearchBoardKey = boardKey;
+}
+
+export function setActiveResearchBoardKey(boardKey) {
+    activeResearchBoardKey = boardKey;
+}
+
+export function clearActiveResearchBoardKey() {
+    activeResearchBoardKey = "";
 }
 
 export function isValidResearchSession(sessionId, boardKey) {
@@ -45,6 +56,7 @@ export function isValidResearchSession(sessionId, boardKey) {
 export function stopResearchSession() {
     researchSessionSeq++;
     currentResearchBoardKey = "";
+    activeResearchBoardKey = "";
     pendingIOSResearchReason = "";
     clearResearchUpdates();
     if (researchActionTimer) {
