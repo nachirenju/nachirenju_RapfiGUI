@@ -64,6 +64,7 @@ export function stopAnalysisSession(state, ctx, { stopEngine = false } = {}) {
     state.sessionId++;
     clearAnalysisTimeout(state);
     resolveAnalysisResult(state, []);
+    if (ctx.clearAnalysisSearchContext) ctx.clearAnalysisSearchContext();
     state.queue = [];
     state.isAnalyzing = false;
     ctx.setAnalyzing(false);
@@ -144,6 +145,7 @@ export async function processAnalysisQueue(state, ctx, sessionId) {
         ctx.trace('SYSTEM', null, 'Analysis Complete');
         clearAnalysisTimeout(state);
         resolveAnalysisResult(state, []);
+        if (ctx.clearAnalysisSearchContext) ctx.clearAnalysisSearchContext();
         if (ctx.engineRuntime.getIsBusy()) ctx.sendToEngine("YXSTOP");
         ctx.engineRuntime.setBusy(false);
         ctx.finishThinkDebug("research-off");
@@ -162,6 +164,7 @@ export async function processAnalysisQueue(state, ctx, sessionId) {
     const currentTurnColor = getNextColorFromHistory(moves);
     const currentNBestAnalysis = item.nbest || 3;
     const { board: tempBoard } = buildBoardFromMoves(moves);
+    if (ctx.setAnalysisSearchContext) ctx.setAnalysisSearchContext(moves);
 
     const winner = getCompletedPositionWinner(tempBoard, moves);
     if (winner) {

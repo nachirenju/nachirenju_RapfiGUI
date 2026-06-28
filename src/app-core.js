@@ -22,7 +22,7 @@ import {
 } from './analysis/session.js';
 import { createDefaultEngineMove } from './ai/moves.js';
 import { isInsideBoard, toNotation, checksFourOnBoard } from './game/board.js';
-import { createMoveHistoryKey } from './game/moves.js';
+import { createMoveHistoryKey, getNextColorFromHistory } from './game/moves.js';
 import { createGameRecord } from './game/record.js';
 import {
     finishGameSession,
@@ -210,6 +210,7 @@ function clearAnalysisTimeout() {
 
 let isResearchMode = false;
 let isInitializingEngine = false;
+let activeAnalysisMoveHistory = null;
 
 let gameLoopInterval = null;
 
@@ -431,7 +432,13 @@ function processEngineLine(line) {
     broadcastEngineLine(line, lineInfo);
 
     if (isAnalysisRunning() || isGameRunning || isResearchMode) {
-        const pvData = parsePvSearchLine(line, GameState.getMoveHistory(), GameState.getNextColor());
+        const parseHistory = isAnalysisRunning() && activeAnalysisMoveHistory
+            ? activeAnalysisMoveHistory
+            : GameState.getMoveHistory();
+        const parseNextColor = isAnalysisRunning() && activeAnalysisMoveHistory
+            ? getNextColorFromHistory(activeAnalysisMoveHistory)
+            : GameState.getNextColor();
+        const pvData = parsePvSearchLine(line, parseHistory, parseNextColor);
         if (pvData) {
             const researchBoardKey = isResearchMode ? ResearchSessionState.getActiveResearchBoardKey() : "";
             const acceptedResearchOutput = isActiveResearchSearchOutput();
@@ -468,7 +475,7 @@ function processEngineLine(line) {
 
     const scoreVal = parseInlineEvalScore(line);
     if (scoreVal !== null && !isNaN(scoreVal) && (isAnalysisRunning() || isActiveGameSearchOutput() || isActiveResearchSearchOutput())) {
-        SearchState.setCurrentLastEval((aiColorGlobal === 2) ? -scoreVal : scoreVal);
+        SearchState.setCurrentLastEval(isAnalysisRunning() ? scoreVal : ((aiColorGlobal === 2) ? -scoreVal : scoreVal));
     }
 
     handleEngineMoveCommand(lineInfo.moveMatch, wasEngineBusy);
@@ -851,7 +858,13 @@ function createAnalysisContext() {
         setResearchMode: (value) => { isResearchMode = value; },
         stopResearchSession: () => ResearchSessionState.stopResearchSession(),
         setGameRunning: (value) => { isGameRunning = value; },
-        setAnalyzing: setAnalysisRunning
+        setAnalyzing: setAnalysisRunning,
+        setAnalysisSearchContext: (moves) => {
+            activeAnalysisMoveHistory = Array.isArray(moves) ? moves.map(move => ({ ...move })) : null;
+        },
+        clearAnalysisSearchContext: () => {
+            activeAnalysisMoveHistory = null;
+        }
     };
 }
 
