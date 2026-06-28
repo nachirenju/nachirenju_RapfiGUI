@@ -34,6 +34,7 @@ export function pauseRunningTimer(timer) {
 }
 
 export function resetGameStateForStart(ctx, data) {
+    ctx.invalidateGameSearch();
     stopGameTimers(ctx);
     ctx.setPlayerTimer(null);
     ctx.setRapfiTimer(null);
@@ -187,6 +188,7 @@ export async function takebackPlayerMove(ctx, reason = "player takeback") {
 
     ctx.clearGameActionTimer();
     ctx.bumpGameActionSeq();
+    ctx.invalidateGameSearch();
     pauseRunningTimer(ctx.getPlayerTimer());
     pauseRunningTimer(ctx.getRapfiTimer());
     ctx.setRapfiThinking(false);
@@ -215,6 +217,7 @@ export function finishGameSession(ctx) {
 }
 
 export async function stopAllActiveModesForChallengeSession(ctx) {
+    ctx.invalidateGameSearch();
     if (ctx.getAnalyzing()) {
         ctx.setAnalyzing(false);
         ctx.stopAnalysisSession();
@@ -238,6 +241,7 @@ export async function startChallengeGameSession(ctx, data) {
     if (DEBUG_MODE) console.log("\x1b[33m[SYSTEM] 挑戦対局開始\x1b[0m");
 
     stopGameTimers(ctx);
+    ctx.invalidateGameSearch();
     ctx.setPlayerTimer(null);
     ctx.setRapfiTimer(null);
     ctx.setIntentionalKill(false);

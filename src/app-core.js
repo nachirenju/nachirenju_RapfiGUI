@@ -164,6 +164,8 @@ function sendToEngine(cmd) {
 
 let gameActionTimer = null;
 let gameActionSeq = 0;
+let gameSearchSeq = 0;
+let activeGameSearchBoardKey = "";
 let lastGameActionTime = 0;
 let gameOperationChain = Promise.resolve();
 let takebackInProgress = false;
@@ -210,6 +212,11 @@ let isResearchMode = false;
 let isInitializingEngine = false;
 
 let gameLoopInterval = null;
+
+function invalidateGameSearch() {
+    gameSearchSeq++;
+    activeGameSearchBoardKey = "";
+}
 
 
 // Rapfiにコマンドを送る処理
@@ -320,7 +327,8 @@ function handleEngineMoveCommand(moveMatch, wasEngineBusy) {
         !isAnalysisRunning() &&
         isRapfiThinking &&
         engineRuntime.getIsReady() &&
-        wasEngineBusy && !isResearchMode && !isAnalysisRunning()
+        wasEngineBusy && !isResearchMode && !isAnalysisRunning() &&
+        isActiveGameSearchOutput()
     ) {
         if (isHumanStyle) {
             const sel = selectHumanLikeMove(SearchState.getCurrentCandidates(), mx, my);
@@ -343,6 +351,22 @@ function resolveAnalysisOnBestMove(lineInfo) {
     clearAnalysisTimeout();
     resolveAnalysisFromBestMove(analysisState);
     return true;
+}
+
+function isActiveGameSearchOutput() {
+    return !isResearchMode
+        && !isAnalysisRunning()
+        && isGameRunning
+        && !gameEnded
+        && activeGameSearchBoardKey
+        && activeGameSearchBoardKey === GameState.getBoardKey();
+}
+
+function isActiveResearchSearchOutput() {
+    const boardKey = ResearchSessionState.getActiveResearchBoardKey();
+    return isResearchMode
+        && !!boardKey
+        && ResearchSessionState.isValidResearchSession(undefined, boardKey);
 }
 
 function schedulePendingIOSResearch() {
@@ -409,15 +433,19 @@ function processEngineLine(line) {
     if (isAnalysisRunning() || isGameRunning || isResearchMode) {
         const pvData = parsePvSearchLine(line, GameState.getMoveHistory(), GameState.getNextColor());
         if (pvData) {
+            const researchBoardKey = isResearchMode ? ResearchSessionState.getActiveResearchBoardKey() : "";
+            const acceptedResearchOutput = isActiveResearchSearchOutput();
             if (pvData.moveCoords) {
                 markThinkEngineOutput("pv", line);
-                SearchState.applySearchStateFromPv(pvData);
+                if (isAnalysisRunning() || isActiveGameSearchOutput() || acceptedResearchOutput) {
+                    SearchState.applySearchStateFromPv(pvData);
+                }
             } else if (hasPv && !line.startsWith('INFO')) {
                 if (DEBUG_MODE) console.log(`[Think DEBUG] non-PV engine status ignored for PV tracking: "${line}"`);
             }
             if (isResearchMode) {
-                const boardKey = ResearchSessionState.getActiveResearchBoardKey();
-                const accepted = pvData.moveCoords && boardKey && ResearchSessionState.isValidResearchSession(undefined, boardKey);
+                const boardKey = researchBoardKey;
+                const accepted = pvData.moveCoords && acceptedResearchOutput;
                 if (accepted) {
                     const turnColor = GameState.getNextColor();
                     const blackScore = (turnColor === 2) ? -pvData.score : pvData.score;
@@ -439,7 +467,7 @@ function processEngineLine(line) {
     }
 
     const scoreVal = parseInlineEvalScore(line);
-    if (scoreVal !== null && !isNaN(scoreVal)) {
+    if (scoreVal !== null && !isNaN(scoreVal) && (isAnalysisRunning() || isActiveGameSearchOutput() || isActiveResearchSearchOutput())) {
         SearchState.setCurrentLastEval((aiColorGlobal === 2) ? -scoreVal : scoreVal);
     }
 
@@ -453,6 +481,7 @@ function handleRapfiMove(x, y) {
     if (!isGameRunning) return;
 
     finishThinkDebug("move-applied");
+    invalidateGameSearch();
     isRapfiThinking = false;
     const rapfiColor = GameState.getNextColor();
     const activeTimer = (isAiVsAi && rapfiColor === 1) ? playerTimer : rapfiTimer;
@@ -569,9 +598,25 @@ async function syncAndThink(aiColor) {
     const activeTimer = (isAiVsAi && aiColorGlobal === 1) ? playerTimer : rapfiTimer;
     if (!activeTimer) return;
 
+    const searchSeq = ++gameSearchSeq;
+    const searchMoves = GameState.getMoveHistory();
+    const searchBoardKey = createMoveHistoryKey(searchMoves);
+    activeGameSearchBoardKey = "";
+
     await engineRuntime.ensureIdle();
+    if (
+        gameSearchSeq !== searchSeq ||
+        !isGameRunning ||
+        gameEnded ||
+        isResearchMode ||
+        isAnalysisRunning() ||
+        searchBoardKey !== GameState.getBoardKey()
+    ) {
+        return;
+    }
 
     SearchState.resetSearchState();
+    activeGameSearchBoardKey = searchBoardKey;
 
     const timeLeft = Math.floor(activeTimer.getCurrentRemaining());
     const configuredMarginMs = Number(gameThinkTimeConfig.turnTimeMarginMs);
@@ -582,7 +627,7 @@ async function syncAndThink(aiColor) {
         ? Math.max(1, Math.floor(activeTimer.initialMs - marginMs))
         : Math.max(1, Math.floor((timeLeft * percent / 100) - marginMs));
 
-    startThinkDebug("game", GameState.getMoveHistory().length, currentNBest, timeLeft);
+    startThinkDebug("game", searchMoves.length, currentNBest, timeLeft);
     
     // Config and START are now sent only once per game initialization
     
@@ -592,7 +637,7 @@ async function syncAndThink(aiColor) {
         increment: activeTimer.incrementMs
     }).forEach(cmd => sendToEngine(cmd));
 
-    sendToEngine(createYXBoardCommand(GameState.getMoveHistory()));
+    sendToEngine(createYXBoardCommand(searchMoves));
     
     sendToEngine(`YXNBEST ${currentNBest}`);
     engineRuntime.setBusy(true);
@@ -759,6 +804,7 @@ function createGameSessionContext() {
         terminateGame,
         terminateByTimeout,
         finishGameAfterPlayerMoveIfNeeded,
+        invalidateGameSearch,
         clearGameActionTimer,
         bumpGameActionSeq: () => { gameActionSeq++; },
         stopAnalysisSession,
@@ -832,6 +878,7 @@ function stopAnalysisSession({ stopEngine = false } = {}) {
 }
 
 function terminateGame(winnerName) {
+    invalidateGameSearch();
     stopGameTimers();
     stopGameLoop();
     const isDraw = winnerName === 'Draw';
@@ -846,6 +893,7 @@ function terminateGame(winnerName) {
 }
 
 function terminateByTimeout(winnerName) {
+    invalidateGameSearch();
     stopGameTimers();
 
     if (!isGameRunning) return;
