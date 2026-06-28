@@ -26,3 +26,6 @@ public/engine/
 # Challenge Mode Data
 public/missingwin.json
 missingwin.json
+
+#agent folder
+.agents/

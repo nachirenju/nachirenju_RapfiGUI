@@ -8,7 +8,7 @@
  * - 読み筋（PV）の可視化と候補手レビューUIの管理
  */
 
-import { BLACK, WHITE, MARGIN, CELL_SIZE } from '../board/renju-engine.js';
+import { BLACK, WHITE } from '../board/renju-engine.js';
 import * as backendCommands from '../ipc/backend-commands.js';
 
 export function installResearchMethods(proto) {
@@ -153,6 +153,8 @@ export function installResearchMethods(proto) {
             };
 
             document.getElementById('pvReviewRank').textContent = data.rank;
+            const reviewCanvas = document.getElementById('pvReviewCanvas');
+            if (reviewCanvas) reviewCanvas.style.backgroundColor = this.boardColor || "#F2E2BF";
             document.getElementById('pvReviewModal').style.display = 'block';
             this.drawPvReviewBoard();
         
@@ -201,18 +203,74 @@ export function installResearchMethods(proto) {
             const ctx = canvas.getContext('2d');
             
             // 1. 盤面の背景（キャッシュ）を描画
-            ctx.drawImage(this.bgCanvas, 0, 0);
+            const w = canvas.width;
+            const cellSize = w / 16;
+            const boardStart = cellSize;
+            const boardEnd = cellSize * 15;
+            const stoneRadius = cellSize * 0.42;
+
+            ctx.clearRect(0, 0, w, w);
+            ctx.fillStyle = this.boardColor || "#F2E2BF";
+            ctx.fillRect(0, 0, w, w);
+            ctx.strokeStyle = "#222";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 0; i < 15; i++) {
+                const p = boardStart + i * cellSize;
+                ctx.moveTo(boardStart, p);
+                ctx.lineTo(boardEnd, p);
+                ctx.moveTo(p, boardStart);
+                ctx.lineTo(p, boardEnd);
+            }
+            ctx.stroke();
+
+            ctx.fillStyle = "#111";
+            [[3, 3], [7, 7], [11, 11], [3, 11], [11, 3]].forEach(([x, y]) => {
+                ctx.beginPath();
+                ctx.arc(boardStart + x * cellSize, boardStart + y * cellSize, Math.max(2, cellSize * 0.11), 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.font = `bold ${Math.max(10, Math.floor(cellSize * 0.48))}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = "#222";
+            for (let i = 0; i < 15; i++) {
+                ctx.fillText(String(15 - i), cellSize * 0.45, boardStart + i * cellSize);
+            }
 
             // 描画ヘルパー関数 (既存の石画像を利用)
             const drawStoneToCtx = (x, y, color, number) => {
-                const cx = MARGIN + x * CELL_SIZE;
-                const cy = MARGIN + y * CELL_SIZE;
-                const stoneImg = (color === BLACK) ? this.blackStoneImg : this.whiteStoneImg;
-                if (stoneImg) ctx.drawImage(stoneImg, cx - 15, cy - 15);
+                const cx = boardStart + x * cellSize;
+                const cy = boardStart + y * cellSize;
+                const gradient = ctx.createRadialGradient(
+                    cx - stoneRadius * 0.3,
+                    cy - stoneRadius * 0.3,
+                    Math.max(1, stoneRadius * 0.1),
+                    cx,
+                    cy,
+                    stoneRadius
+                );
+                if (color === BLACK) {
+                    gradient.addColorStop(0, "#555");
+                    gradient.addColorStop(1, "#000");
+                } else {
+                    gradient.addColorStop(0, "#fff");
+                    gradient.addColorStop(1, "#d8d8d8");
+                }
+                ctx.beginPath();
+                ctx.arc(cx, cy, stoneRadius, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                if (color === WHITE) {
+                    ctx.strokeStyle = "#b8b8b8";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
                 
                 if (number !== null) {
                     ctx.fillStyle = (color === BLACK) ? "white" : "black";
-                    ctx.font = "bold 12px Arial";
+                    ctx.font = `bold ${Math.max(10, Math.floor(cellSize * 0.46))}px Arial`;
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     ctx.fillText(number.toString(), cx, cy);
@@ -268,7 +326,13 @@ export function installResearchMethods(proto) {
          // 4. 最終手の赤い四角マークとテキスト更新
             if(lastMove) {
                 ctx.strokeStyle = "red"; ctx.lineWidth = 2;
-                ctx.strokeRect(MARGIN + lastMove.x*CELL_SIZE - 7, MARGIN + lastMove.y*CELL_SIZE - 7, 14, 14);
+                const markSize = Math.max(10, cellSize * 0.55);
+                ctx.strokeRect(
+                    boardStart + lastMove.x * cellSize - markSize / 2,
+                    boardStart + lastMove.y * cellSize - markSize / 2,
+                    markSize,
+                    markSize
+                );
                 
                 const currentMoveStr = this.pvReviewData.pv[this.pvReviewData.step - 1];
                 document.getElementById('pvReviewText').innerHTML = `読み筋 <span style="color:#007bff">${this.pvReviewData.step}</span> 手目 : ${currentMoveStr}${scoreText}`;
