@@ -806,6 +806,7 @@ function createGameSessionContext() {
         sendToEngine,
         sendToRenderer,
         broadcastLog,
+        playRapfiMove: handleRapfiMove,
         initializeGameSession,
         syncAndThink,
         terminateGame,

@@ -95,6 +95,7 @@ export function applyInitialStones(stones = []) {
 export function startInitialTurn(ctx, data, nextColor) {
     const playerTimer = ctx.getPlayerTimer();
     const rapfiTimer = ctx.getRapfiTimer();
+    const shouldPlayCenterOpening = GameState.getMoveHistory().length === 0 && nextColor === 1;
 
     if (ctx.getAiVsAi()) {
         ctx.setAiColorGlobal(nextColor);
@@ -106,8 +107,9 @@ export function startInitialTurn(ctx, data, nextColor) {
             rapfiTimer.start();
         }
 
-        ctx.syncAndThink(ctx.getAiColorGlobal());
         ctx.sendToRenderer('game_started', { turn: 'rapfi', nextColor, playerTime: data.playerTime, aiTime: data.aiTime });
+        if (shouldPlayCenterOpening) ctx.playRapfiMove(7, 7);
+        else ctx.syncAndThink(ctx.getAiColorGlobal());
         return;
     }
 
@@ -117,8 +119,9 @@ export function startInitialTurn(ctx, data, nextColor) {
     } else {
         ctx.setRapfiThinking(true);
         if (rapfiTimer) rapfiTimer.start();
-        ctx.syncAndThink(ctx.getAiColorGlobal());
         ctx.sendToRenderer('game_started', { turn: 'rapfi', nextColor, playerTime: data.playerTime, aiTime: data.aiTime });
+        if (shouldPlayCenterOpening) ctx.playRapfiMove(7, 7);
+        else ctx.syncAndThink(ctx.getAiColorGlobal());
     }
 }
 

@@ -10,6 +10,8 @@
  */
 
 export function createYXBoardCommand(moves) {
+    if (!moves || moves.length === 0) return 'YXBOARD\nDONE';
+
     let cmd = 'YXBOARD';
 
     for (const move of moves || []) {

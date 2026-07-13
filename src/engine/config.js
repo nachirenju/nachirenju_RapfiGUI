@@ -9,17 +9,25 @@
  * - エンジン互換性に関する設定の切り替え
  */
 
+const ENGINE_MAX_MOVES = 200;
+
+function getEngineMaxDepth(maxDepth) {
+    const parsed = Number.parseInt(maxDepth, 10);
+    if (parsed === 0) return 100;
+    return Number.isFinite(parsed) ? parsed : 50;
+}
+
 export function createGameConfigCommands(settings, threadCount) {
     const es = settings || {};
     const commands = [
         `INFO STRENGTH ${es.strength || 100}`,
         `INFO THREAD_NUM ${threadCount}`,
         `INFO MAX_NODE ${es.maxNodes ? es.maxNodes * 1000 : 0}`,
-        `INFO MAX_DEPTH ${es.maxDepth !== undefined ? es.maxDepth : 50}`,
-        `INFO HASH_SIZE ${es.hashSize || 1024}`
+        `INFO MAX_DEPTH ${getEngineMaxDepth(es.maxDepth)}`,
+        `INFO HASH_SIZE ${es.hashSize || 1024}`,
+        `INFO MAX_MOVES ${ENGINE_MAX_MOVES}`
     ];
 
-    if (es.maxMoves) commands.push(`INFO MAX_MOVES ${es.maxMoves}`);
     commands.push('INFO RULE 2');
     return commands;
 }
@@ -29,10 +37,10 @@ export function createResearchConfigCommands(settings, { threadCount, hashSize }
     const commands = [
         `INFO THREAD_NUM ${threadCount}`,
         'INFO MAX_NODE 0',
-        `INFO HASH_SIZE ${hashSize || es.hashSize || 1024}`
+        `INFO HASH_SIZE ${hashSize || es.hashSize || 1024}`,
+        `INFO MAX_MOVES ${ENGINE_MAX_MOVES}`
     ];
 
-    if (es.maxMoves) commands.push(`INFO MAX_MOVES ${es.maxMoves}`);
     commands.push('INFO RULE 2');
     return commands;
 }

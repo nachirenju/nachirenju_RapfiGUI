@@ -1199,6 +1199,21 @@ body {
                         <label for="saveSettings" style="font-weight: normal; font-size: 12px; cursor: pointer;">次回もこの設定を使用する</label>
                     </div>
 
+                    <details style="border-top: 1px dashed #ccc; padding-top: 8px; margin-top: 4px; font-size: 12px; color: #666;">
+                        <summary style="cursor: pointer; font-weight: bold; color: #555;" data-i18n="About">About</summary>
+                        <div style="margin-top: 6px; line-height: 1.5;">
+                            <div data-i18n="このアプリは、dbloo氏作成のRapfiという連珠ソフトをブラウザで扱えるようにしたものです。">このアプリは、dbloo氏作成のRapfiという連珠ソフトをブラウザで扱えるようにしたものです。</div>
+                            <div>
+                                <span data-i18n="dbloo氏のリポジトリはこちら。">dbloo氏のリポジトリはこちら。</span>
+                                <a href="https://github.com/dhbloo/rapfi" target="_blank" rel="noopener noreferrer" data-i18n="こちら">こちら</a>
+                            </div>
+                            <div>
+                                <span data-i18n="当アプリのソースコードはこちらで公開しています。">当アプリのソースコードはこちらで公開しています。</span>
+                                <a href="https://github.com/nachirenju/nachirenju_RapfiGUI" target="_blank" rel="noopener noreferrer" data-i18n="こちら">こちら</a>
+                            </div>
+                        </div>
+                    </details>
+
                     <div class="row" style="justify-content: flex-start; gap: 10px; border-top: 1px dashed #ccc; padding-top: 8px; margin-top: 4px;">
                         <label class="debug-switch">
                             <input type="checkbox" id="debugModeToggle">
@@ -1314,7 +1329,7 @@ body {
                         </label>
                     </div>
                   <div class="row">
-    <label>引き分け手数 (MAX_MOVES)<br><span style="font-size:10px; font-weight:normal;">(0:無制限, 150:旧ルールに準拠)</span></label>
+    <label>引き分け手数<br><span style="font-size:10px; font-weight:normal;">(0:無制限, 150:旧ルールに準拠 / Rapfiへは200固定送信)</span></label>
     <input type="number" id="engMaxMoves" value="150">
 </div>
                     <div class="row">
