@@ -35,6 +35,15 @@ export function startNewResearchSession(boardKey) {
     return researchSessionSeq;
 }
 
+export function invalidateResearchPosition(boardKey = "") {
+    researchSessionSeq++;
+    currentResearchBoardKey = boardKey;
+    activeResearchBoardKey = "";
+    pendingIOSResearchReason = "";
+    clearResearchUpdates();
+    return researchSessionSeq;
+}
+
 export function setCurrentResearchBoardKey(boardKey) {
     currentResearchBoardKey = boardKey;
 }

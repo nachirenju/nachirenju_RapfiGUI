@@ -30,6 +30,7 @@ export function installGameControlMethods(proto) {
         const syncSeq = ++this.researchSyncSeq;
         const historySnapshot = this.moveHistory.map(move => ({ ...move }));
         this.researchBoardKey = this.getResearchBoardKey(historySnapshot);
+        backendCommands.invalidateResearch(this.researchBoardKey);
         if (this.researchSyncTimer) clearTimeout(this.researchSyncTimer);
         this.researchSyncTimer = setTimeout(() => {
             if (!this.isResearchMode || this.researchSyncSeq !== syncSeq) return;
@@ -61,6 +62,7 @@ export function installGameControlMethods(proto) {
             const x = coords.ix;
             const y = coords.iy;
             if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE || this.board[y][x] !== EMPTY) return; //着手できないときは何もしない
+            if (this.takebackPending) return;
             if (this.quizMode) { this.checkQuizAnswer(x, y); return; }
 
           if (this.isResearchMode) {

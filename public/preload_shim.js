@@ -53,6 +53,7 @@ window.electronAPI = {
     saveAnalysisResult:      (data)   => _send('save_analysis_result', data),
     saveQuizList:            (list)   => _send('save_quiz_list', list),
     toggleResearch:          (en, nb, th, hs) => _send('toggle_research', en, nb, th, hs),
+    invalidateResearch:      (boardKey) => _send('research_invalidate', boardKey),
     researchSync:            (hist, nb, th, hs) => _send('research_sync', hist, nb, th, hs),
     researchClick:           (move)   => _send('research_click', move),
     sendUpdateEngineSetting: (data)   => _send('update_engine_setting', data),

@@ -44,6 +44,10 @@ export function toggleResearch(enabled, multiPv, threads, hashSize) {
     getApi()?.toggleResearch(enabled, multiPv, threads, hashSize);
 }
 
+export function invalidateResearch(boardKey) {
+    getApi()?.invalidateResearch?.(boardKey);
+}
+
 export function researchSync(moveHistory, multiPv, threads, hashSize) {
     getApi()?.researchSync(moveHistory, multiPv, threads, hashSize);
 }

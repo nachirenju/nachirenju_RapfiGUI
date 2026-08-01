@@ -34,16 +34,20 @@ export async function stopEngineBeforeResearchStart({
     engineRuntime,
     sendToEngine,
     delay,
-    sessionId
+    sessionId,
+    isCurrent = () => true
 }) {
+    if (!isCurrent()) return false;
     if (engineRuntime.getIsBusy()) {
         const idleSuccess = await engineRuntime.ensureIdle(3000);
-        if (!idleSuccess) return false;
+        if (!idleSuccess || !isCurrent()) return false;
     } else {
+        if (!isCurrent()) return false;
         if (DEBUG_MODE) console.log(`[Research DEBUG #${sessionId}] stopping previous engine session before research start.`);
         sendToEngine("YXSTOP");
         engineRuntime.setBusy(false);
         await delay(50);
+        if (!isCurrent()) return false;
     }
     return true;
 }
@@ -54,15 +58,19 @@ export async function prepareResearchEngine({
     initializeResearchSession,
     delay,
     sessionId,
-    reason
+    reason,
+    isCurrent = () => true
 }) {
+    if (!isCurrent()) return false;
     if (!engineRuntime.getSupportsThreads()) {
         if (!engineRuntime.getIsIOS() && reason !== "toggle") {
+            if (!isCurrent()) return false;
             if (DEBUG_MODE) console.log(`[Research DEBUG #${sessionId}] single-thread engine refresh before research update.`);
             engineRuntime.discard(`research:${reason}:single-thread-refresh`);
             await delay(350);
+            if (!isCurrent()) return false;
             const restartedReady = await engineRuntime.ensureReady();
-            if (!restartedReady) {
+            if (!restartedReady || !isCurrent()) {
                 if (DEBUG_MODE) console.error(`[Research DEBUG #${sessionId}] engine failed to ready after single-thread refresh.`);
                 return false;
             }
@@ -72,40 +80,44 @@ export async function prepareResearchEngine({
                 engineRuntime,
                 sendToEngine,
                 delay,
-                sessionId
+                sessionId,
+                isCurrent
             });
+            if (!isCurrent()) return false;
             if (!stopped) {
                 if (DEBUG_MODE) console.log(`[Research DEBUG #${sessionId}] YXSTOP timed out. Restarting engine for safety.`);
                 engineRuntime.discard(`research:${reason}:ios-stop-timeout`);
                 await delay(100);
+                if (!isCurrent()) return false;
                 const restartedReady = await engineRuntime.ensureReady();
-                if (!restartedReady) {
+                if (!restartedReady || !isCurrent()) {
                     if (DEBUG_MODE) console.error(`[Research DEBUG #${sessionId}] engine failed to ready after iOS timeout restart.`);
                     return false;
                 }
             }
         }
-        await initializeResearchSession();
-        return true;
+        return await initializeResearchSession(isCurrent);
     }
 
     const idleSuccess = await stopEngineBeforeResearchStart({
         engineRuntime,
         sendToEngine,
         delay,
-        sessionId
+        sessionId,
+        isCurrent
     });
+    if (!isCurrent()) return false;
     if (!idleSuccess) {
         if (DEBUG_MODE) console.log(`[Research DEBUG #${sessionId}] YXSTOP timed out. Restarting engine for safety.`);
         engineRuntime.discard(`research:${reason}:stop-timeout`);
         await delay(100);
+        if (!isCurrent()) return false;
         const restartedReady = await engineRuntime.ensureReady();
-        if (!restartedReady) {
+        if (!restartedReady || !isCurrent()) {
             if (DEBUG_MODE) console.error(`[Research DEBUG #${sessionId}] engine failed to ready after timeout restart.`);
             return false;
         }
     }
 
-    await initializeResearchSession();
-    return true;
+    return await initializeResearchSession(isCurrent);
 }

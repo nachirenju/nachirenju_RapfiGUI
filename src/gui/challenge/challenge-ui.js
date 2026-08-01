@@ -156,8 +156,10 @@ export function installChallengeMethods(proto) {
 
         let filteredData = this.challengeDataList.filter(item => {
             if (filterColor !== 'all' && item._startColor.toString() !== filterColor) return false;
-            if (hideSolved && this.isChallengeSolved(item.challengeId)) return false;
+            const isSolved = this.isChallengeSolved(item.challengeId);
+            if (hideSolved && filterSkip !== 'solved' && isSolved) return false;
             if (filterSkip === 'skipped' && !this.isChallengeSkipped(item.challengeId)) return false;
+            if (filterSkip === 'solved' && !isSolved) return false;
             if (filterSkip === 'new' && !(this._newChallengeIds && this._newChallengeIds.has(item.challengeId))) return false;
             
             const m = parseInt(item.m_value) || 0;

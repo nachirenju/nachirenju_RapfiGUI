@@ -28,6 +28,7 @@ export const BOARD_SIZE = 15;
         this.enableTimeSound = true;
         this.showBoardCoordinates = true;
         this.useStoneShading = true;
+        this.useLargeBoardText = false;
         this.lastMove = null;
         this.DIRS = [[1,0], [0,1], [1,1], [1,-1]];
         
@@ -142,7 +143,7 @@ export const BOARD_SIZE = 15;
         
         if (this.showBoardCoordinates !== false) {
             ctx.fillStyle = "#000";
-            ctx.font = "bold 12px Arial";
+            ctx.font = `bold ${this.useLargeBoardText ? 18 : 12}px Arial`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             
@@ -170,10 +171,11 @@ export const BOARD_SIZE = 15;
         
         // 星（黒い点）を描く
         const stars = [[3,3], [11,3], [7,7], [3,11], [11,11]];
+        const starRadius = this.useLargeBoardText ? 4 : 3;
         ctx.fillStyle = "#000";
         stars.forEach(([x, y]) => {
             ctx.beginPath(); 
-            ctx.arc(MARGIN + x * CELL_SIZE, MARGIN + y * CELL_SIZE, 3, 0, Math.PI*2); 
+            ctx.arc(MARGIN + x * CELL_SIZE, MARGIN + y * CELL_SIZE, starRadius, 0, Math.PI*2);
             ctx.fill();
         });
 
@@ -183,12 +185,14 @@ export const BOARD_SIZE = 15;
 
     createStoneImage(color) {
         const cvs = document.createElement('canvas');
-        cvs.width = 30; // 石の直径 (15 * 2)
-        cvs.height = 30;
+        const diameter = this.useLargeBoardText ? 34 : 30;
+        const radius = diameter / 2;
+        cvs.width = diameter;
+        cvs.height = diameter;
         const ctx = cvs.getContext('2d', { alpha: true });
         
         ctx.beginPath();
-        ctx.arc(15, 15, 15, 0, Math.PI * 2);
+        ctx.arc(radius, radius, radius, 0, Math.PI * 2);
         if (this.useStoneShading === false) {
             ctx.fillStyle = color === BLACK ? "#111" : "#f7f7f7";
             ctx.fill();
@@ -197,7 +201,7 @@ export const BOARD_SIZE = 15;
             ctx.stroke();
             return cvs;
         }
-        const grad = ctx.createRadialGradient(10, 10, 2, 15, 15, 15);
+        const grad = ctx.createRadialGradient(radius * 0.67, radius * 0.67, 2, radius, radius, radius);
         if (color === BLACK) { 
             grad.addColorStop(0, "#666"); 
             grad.addColorStop(1, "#000"); 
@@ -223,7 +227,13 @@ export const BOARD_SIZE = 15;
         // 3. 最終手の赤い四角マーク
         if(this.lastMove) {
             this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(MARGIN + this.lastMove.x*CELL_SIZE - 7, MARGIN + this.lastMove.y*CELL_SIZE - 7, 14, 14);
+            const markerSize = this.useLargeBoardText ? 20 : 14;
+            this.ctx.strokeRect(
+                MARGIN + this.lastMove.x * CELL_SIZE - markerSize / 2,
+                MARGIN + this.lastMove.y * CELL_SIZE - markerSize / 2,
+                markerSize,
+                markerSize
+            );
         }
         
         // 4. 研究モード等のオーバーレイ
@@ -238,6 +248,8 @@ export const BOARD_SIZE = 15;
       drawResearchOverlays() {
             const ctx = this.ctx;
             const K = 210; // 勝率計算用定数
+            const useLargeText = this.useLargeBoardText === true;
+            const markerRadius = useLargeText ? 17 : 15;
 
             for (const key in this.researchCandidates) {
                 const data = this.researchCandidates[key];
@@ -266,7 +278,7 @@ export const BOARD_SIZE = 15;
                 }
 
                 ctx.beginPath();
-                ctx.arc(cx, cy, 15, 0, Math.PI * 2);
+                ctx.arc(cx, cy, markerRadius, 0, Math.PI * 2);
                 ctx.fillStyle = fillStyle;
                 ctx.fill();
                 
@@ -289,7 +301,12 @@ export const BOARD_SIZE = 15;
                 };
                 
                 // 1. 順位
-                drawOutlinedText(`(${data.rank})`, cx, cy - 9, "bold 10px Arial");
+                drawOutlinedText(
+                    `(${data.rank})`,
+                    cx,
+                    cy - (useLargeText ? 10 : 9),
+                    `bold ${useLargeText ? 12 : 10}px Arial`
+                );
 
                 // 2. 評価値 (Mの場合は手数を計算して表示)
                 let scoreText = data.score;
@@ -300,7 +317,12 @@ export const BOARD_SIZE = 15;
                     const moves = 30000 + data.score;
                     scoreText = "-M" + Math.abs(moves);
                 }
-                drawOutlinedText(scoreText, cx, cy + 1, "bold 11px Arial");
+                drawOutlinedText(
+                    scoreText,
+                    cx,
+                    cy + 1,
+                    `bold ${useLargeText ? 14 : 11}px Arial`
+                );
 
                 // 3. 勝率
                 let viewScore = data.score;
@@ -310,7 +332,12 @@ export const BOARD_SIZE = 15;
                 const winRate = 1 / (1 + Math.exp(-viewScore / K));
                 const winRatePct = Math.round(winRate * 100);
 
-                drawOutlinedText(`${winRatePct}%`, cx, cy + 11, "10px Arial");
+                drawOutlinedText(
+                    `${winRatePct}%`,
+                    cx,
+                    cy + (useLargeText ? 12 : 11),
+                    `bold ${useLargeText ? 11 : 10}px Arial`
+                );
             }
         }
 
@@ -348,16 +375,16 @@ export const BOARD_SIZE = 15;
         this.ctx.save();
         this.ctx.globalAlpha = opacity;
         
-        // キャッシュした石の画像を貼り付け（中心座標を合わせるため -15 ずらす）
+        // キャッシュした石の画像を中心座標に合わせて貼り付ける
         const stoneImg = (color === BLACK) ? this.blackStoneImg : this.whiteStoneImg;
         if (stoneImg) {
-            this.ctx.drawImage(stoneImg, cx - 15, cy - 15);
+            this.ctx.drawImage(stoneImg, cx - stoneImg.width / 2, cy - stoneImg.height / 2);
         }
 
         // 手数（数字）の描画
         if (this.showNumbers && number !== null) {
             this.ctx.fillStyle = (color === BLACK) ? "white" : "black";
-            this.ctx.font = "bold 12px Arial";
+            this.ctx.font = `bold ${this.useLargeBoardText ? 16 : 12}px Arial`;
             this.ctx.textAlign = "center";
             this.ctx.textBaseline = "middle";
             this.ctx.fillText(number.toString(), cx, cy);
@@ -381,5 +408,3 @@ export const BOARD_SIZE = 15;
     canWinAt(cx,cy,dx,dy,k,color){const tx=cx+k*dx,ty=cy+k*dy;if(tx<0||tx>=15||ty<0||ty>=15||this.board[ty][tx]!==EMPTY)return false;this.board[ty][tx]=color;const win=this.checkWin(tx,ty,color);this.board[ty][tx]=EMPTY;return win;}
     checkWin(x,y,color){let cnt=1;let tx=x+1;while(tx<15&&this.board[y][tx]===color){cnt++;tx++;}tx=x-1;while(tx>=0&&this.board[y][tx]===color){cnt++;tx--;}if(color===BLACK?cnt===5:cnt>=5)return true;cnt=1;let ty=y+1;while(ty<15&&this.board[ty][x]===color){cnt++;ty++;}ty=y-1;while(ty>=0&&this.board[ty][x]===color){cnt++;ty--;}if(color===BLACK?cnt===5:cnt>=5)return true;cnt=1;tx=x+1;ty=y+1;while(tx<15&&ty<15&&this.board[ty][tx]===color){cnt++;tx++;ty++;}tx=x-1;ty=y-1;while(tx>=0&&ty>=0&&this.board[ty][tx]===color){cnt++;tx--;ty--;}if(color===BLACK?cnt===5:cnt>=5)return true;cnt=1;tx=x+1;ty=y-1;while(tx<15&&ty>=0&&this.board[ty][tx]===color){cnt++;tx++;ty--;}tx=x-1;ty=y+1;while(tx>=0&&ty<15&&this.board[ty][tx]===color){cnt++;tx--;ty++;}if(color===BLACK?cnt===5:cnt>=5)return true;return false;}
 }
-
-

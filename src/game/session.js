@@ -179,7 +179,7 @@ export async function handlePlayerMove(ctx, move) {
         if (DEBUG_MODE) console.log(`[AppCore DEBUG] Player moved. Setting isRapfiThinking = true and calling syncAndThink`);
         ctx.setRapfiThinking(true);
         if (rapfiTimer) rapfiTimer.start();
-        ctx.syncAndThink(ctx.getAiColorGlobal());
+        void ctx.syncAndThink(ctx.getAiColorGlobal());
     }
 }
 
@@ -191,15 +191,38 @@ export async function takebackPlayerMove(ctx, reason = "player takeback") {
 
     ctx.clearGameActionTimer();
     ctx.bumpGameActionSeq();
-    ctx.invalidateGameSearch();
+    const takebackSeq = ctx.invalidateGameSearch();
+    const takebackBoardKey = GameState.getBoardKey();
+    const isCurrentTakeback = () => ctx.getGameRunning()
+        && !ctx.getGameEnded()
+        && ctx.getGameSearchSeq() === takebackSeq
+        && GameState.getBoardKey() === takebackBoardKey;
     pauseRunningTimer(ctx.getPlayerTimer());
     pauseRunningTimer(ctx.getRapfiTimer());
     ctx.setRapfiThinking(false);
 
+    const engineGeneration = ctx.engineRuntime.getGeneration();
     if (ctx.engineRuntime.getIsBusy()) {
-        ctx.sendToEngine("YXSTOP");
-        await ctx.engineRuntime.ensureIdle();
+        const idleSuccess = await ctx.engineRuntime.ensureIdle();
+        if (!isCurrentTakeback()) return true;
+
+        if (!idleSuccess || ctx.engineRuntime.getGeneration() !== engineGeneration) {
+            if (idleSuccess) {
+                if (DEBUG_MODE) console.warn(`[Game DEBUG] ${reason}: engine generation changed during takeback; reinitializing.`);
+            }
+
+            const resetReason = idleSuccess ? 'generation-changed' : 'stop-timeout';
+            ctx.engineRuntime.discard(`game-takeback:${reason}:${resetReason}`);
+            await delay(100);
+            if (!isCurrentTakeback()) return true;
+
+            const ready = await ctx.engineRuntime.ensureReady();
+            if (!ready || !isCurrentTakeback()) return true;
+            await ctx.initializeGameSession();
+            if (!isCurrentTakeback()) return true;
+        }
     }
+    if (!isCurrentTakeback()) return true;
     SearchState.resetSearchState();
 
     const playerTimer = ctx.getPlayerTimer();

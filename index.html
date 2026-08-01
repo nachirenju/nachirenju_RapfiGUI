@@ -94,6 +94,15 @@ body {
             width: 540px;
             max-width: 100%;
         }
+
+        .board_panel.ui-large-board {
+            width: 570px;
+        }
+
+        .board_panel.ui-large-board > .board-wrapper {
+            width: 570px;
+            max-width: 100%;
+        }
         
         .board-wrapper { position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         
@@ -904,8 +913,10 @@ body {
             #languageSelect { margin-bottom: 6px; }
             .container { gap: 8px; }
             .board_panel, .side_panel { width: 100%; }
+            .board_panel.ui-large-board { width: 100%; }
             .board_panel { gap: 6px; }
             .board-wrapper { width: 100%; max-width: min(100vw - 12px, 540px); }
+            .board_panel.ui-large-board > .board-wrapper { max-width: min(100vw - 12px, 570px); }
             .nav-buttons { padding: 4px; gap: 4px; }
             .nav-row { gap: 4px; }
             .nav-btn { width: 38px; min-height: 30px; font-size: 13px; }
@@ -1460,6 +1471,10 @@ body {
                         <div><input type="checkbox" id="uiStoneShading" checked onchange="app.applyUiSettings()"></div>
                     </div>
                     <div class="row">
+                        <label for="uiLargeBoardText" data-i18n="文字を大きく表示する">文字を大きく表示する</label>
+                        <div><input type="checkbox" id="uiLargeBoardText" onchange="app.applyUiSettings()"></div>
+                    </div>
+                    <div class="row">
                         <label for="uiTimerOnSide" data-i18n="持ち時間表示を右側の欄に移動する">持ち時間表示を右側の欄に移動する</label>
                         <div><input type="checkbox" id="uiTimerOnSide" onchange="app.applyUiSettings()"></div>
                     </div>
@@ -1596,6 +1611,7 @@ body {
                         <select id="challengeFilterSkip" onchange="if(document.getElementById('challengePageSelect')) document.getElementById('challengePageSelect').value='1'; app.saveChallengeFilter(); app.renderChallengeList()">
                             <option value="all" data-i18n="すべて">すべて</option>
                             <option value="skipped" data-i18n="Skip済みのみ">Skip済みのみ</option>
+                            <option value="solved" data-i18n="クリア済みのみ">クリア済みのみ</option>
                             <option value="new" data-i18n="NEWのみ">NEWのみ</option>
                         </select>
                     </div>

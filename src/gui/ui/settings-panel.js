@@ -37,6 +37,7 @@ export function installSettingsMethods(proto) {
         const timeSound = document.getElementById('uiTimeSound');
         const boardCoords = document.getElementById('uiBoardCoords');
         const stoneShading = document.getElementById('uiStoneShading');
+        const largeBoardText = document.getElementById('uiLargeBoardText');
         const timerOnSide = document.getElementById('uiTimerOnSide');
 
         if (moveSound) this.enableMoveSound = moveSound.checked;
@@ -44,10 +45,15 @@ export function installSettingsMethods(proto) {
 
         const nextBoardCoords = boardCoords ? boardCoords.checked : true;
         const nextStoneShading = stoneShading ? stoneShading.checked : true;
-        const shouldRedrawBoard = this.showBoardCoordinates !== nextBoardCoords || this.useStoneShading !== nextStoneShading;
+        const nextLargeBoardText = largeBoardText?.checked ?? false;
+        const shouldRedrawBoard = this.showBoardCoordinates !== nextBoardCoords
+            || this.useStoneShading !== nextStoneShading
+            || this.useLargeBoardText !== nextLargeBoardText;
 
         this.showBoardCoordinates = nextBoardCoords;
         this.useStoneShading = nextStoneShading;
+        this.useLargeBoardText = nextLargeBoardText;
+        document.querySelector('.board_panel')?.classList.toggle('ui-large-board', nextLargeBoardText);
         this.updateTimerDisplayPosition(timerOnSide?.checked ?? false);
 
         if (shouldRedrawBoard) {
@@ -121,6 +127,7 @@ export function installSettingsMethods(proto) {
             uiTimeSound: document.getElementById('uiTimeSound').checked,
             uiBoardCoords: document.getElementById('uiBoardCoords').checked,
             uiStoneShading: document.getElementById('uiStoneShading').checked,
+            uiLargeBoardText: document.getElementById('uiLargeBoardText')?.checked ?? false,
             uiTimerOnSide: document.getElementById('uiTimerOnSide')?.checked ?? false,
             debugMode: document.getElementById('debugModeToggle') ? document.getElementById('debugModeToggle').checked : false
         };
@@ -173,6 +180,7 @@ export function installSettingsMethods(proto) {
                 if (c.uiTimeSound !== undefined) document.getElementById('uiTimeSound').checked = c.uiTimeSound;
                 if (c.uiBoardCoords !== undefined) document.getElementById('uiBoardCoords').checked = c.uiBoardCoords;
                 if (c.uiStoneShading !== undefined) document.getElementById('uiStoneShading').checked = c.uiStoneShading;
+                if (c.uiLargeBoardText !== undefined) document.getElementById('uiLargeBoardText').checked = c.uiLargeBoardText;
                 if (c.uiTimerOnSide !== undefined) document.getElementById('uiTimerOnSide').checked = c.uiTimerOnSide;
                 if (c.debugMode !== undefined) {
                     const toggle = document.getElementById('debugModeToggle');

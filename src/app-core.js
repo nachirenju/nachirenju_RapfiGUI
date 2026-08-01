@@ -166,9 +166,12 @@ let gameActionTimer = null;
 let gameActionSeq = 0;
 let gameSearchSeq = 0;
 let activeGameSearchBoardKey = "";
+let activeGameSearchSeq = 0;
+let activeGameEngineGeneration = -1;
 let lastGameActionTime = 0;
 let gameOperationChain = Promise.resolve();
 let takebackInProgress = false;
+let researchOperationChain = Promise.resolve();
 
 // 詳細設定及び対局状態管理
 let isGameRunning = false;
@@ -217,6 +220,9 @@ let gameLoopInterval = null;
 function invalidateGameSearch() {
     gameSearchSeq++;
     activeGameSearchBoardKey = "";
+    activeGameSearchSeq = 0;
+    activeGameEngineGeneration = -1;
+    return gameSearchSeq;
 }
 
 
@@ -360,6 +366,8 @@ function isActiveGameSearchOutput() {
         && isGameRunning
         && !gameEnded
         && activeGameSearchBoardKey
+        && activeGameSearchSeq === gameSearchSeq
+        && activeGameEngineGeneration === engineRuntime.getGeneration()
         && activeGameSearchBoardKey === GameState.getBoardKey();
 }
 
@@ -586,7 +594,8 @@ async function initializeGameSession() {
     if (DEBUG_MODE) console.log(`[AppCore DEBUG] Engine initialization finished after ${waitTime}ms.`);
 }
 
-async function initializeResearchSession() {
+async function initializeResearchSession(isCurrent = () => true) {
+    if (!isCurrent()) return false;
     const es = lastEngineSettings || {};
     createResearchConfigCommands(es, {
         threadCount: getEngineThreadCount(getResearchThreadCount(es.threads)),
@@ -594,6 +603,7 @@ async function initializeResearchSession() {
     }).forEach(cmd => sendToEngine(cmd));
     sendToEngine(`START ${BOARD_SIZE}`);
     await delay(300);
+    return isCurrent();
 }
 
 async function syncAndThink(aiColor) {
@@ -606,24 +616,41 @@ async function syncAndThink(aiColor) {
     if (!activeTimer) return;
 
     const searchSeq = ++gameSearchSeq;
-    const searchMoves = GameState.getMoveHistory();
+    const searchMoves = GameState.getMoveHistory().map(move => ({ ...move }));
     const searchBoardKey = createMoveHistoryKey(searchMoves);
+    let engineGeneration = engineRuntime.getGeneration();
     activeGameSearchBoardKey = "";
+    activeGameSearchSeq = 0;
+    activeGameEngineGeneration = -1;
 
-    await engineRuntime.ensureIdle();
-    if (
-        gameSearchSeq !== searchSeq ||
-        !isGameRunning ||
-        gameEnded ||
-        isResearchMode ||
-        isAnalysisRunning() ||
-        searchBoardKey !== GameState.getBoardKey()
-    ) {
-        return;
+    const isCurrentSearch = () => gameSearchSeq === searchSeq
+        && isGameRunning
+        && !gameEnded
+        && !isResearchMode
+        && !isAnalysisRunning()
+        && searchBoardKey === GameState.getBoardKey();
+
+    const idleSuccess = await engineRuntime.ensureIdle();
+    if (!isCurrentSearch()) return;
+
+    if (!idleSuccess || engineRuntime.getGeneration() !== engineGeneration) {
+        const resetReason = idleSuccess ? 'generation-changed' : 'stop-timeout';
+        engineRuntime.discard(`game-search:${searchSeq}:${resetReason}`);
+        await delay(100);
+        if (!isCurrentSearch()) return;
+
+        const ready = await engineRuntime.ensureReady();
+        if (!ready || !isCurrentSearch()) return;
+
+        await initializeGameSession();
+        if (!isCurrentSearch()) return;
+        engineGeneration = engineRuntime.getGeneration();
     }
 
     SearchState.resetSearchState();
     activeGameSearchBoardKey = searchBoardKey;
+    activeGameSearchSeq = searchSeq;
+    activeGameEngineGeneration = engineGeneration;
 
     const timeLeft = Math.floor(activeTimer.getCurrentRemaining());
     const configuredMarginMs = Number(gameThinkTimeConfig.turnTimeMarginMs);
@@ -645,62 +672,78 @@ async function syncAndThink(aiColor) {
     }).forEach(cmd => sendToEngine(cmd));
 
     sendToEngine(createYXBoardCommand(searchMoves));
-    
-    sendToEngine(`YXNBEST ${currentNBest}`);
     engineRuntime.setBusy(true);
+    sendToEngine(`YXNBEST ${currentNBest}`);
 }
 
 // 研究モード開始用関数
 
 
-async function startResearchSession(reason = "manual") {
-    if (!isResearchMode) return;
-    const sessionId = ResearchSessionState.startNewResearchSession(GameState.getBoardKey());
+function isCurrentResearchRequest(sessionId, boardKey) {
+    return isResearchMode
+        && ResearchSessionState.isValidResearchSession(sessionId, boardKey)
+        && GameState.getBoardKey() === boardKey;
+}
 
-    // We no longer restart the engine. If it's busy, the old search result will be 
-    // discarded via activeThinkSessionId mismatch. The new commands will queue.
+function startResearchSession(reason = "manual") {
+    if (!isResearchMode) return Promise.resolve(false);
+
+    const moves = GameState.getMoveHistory().map(move => ({ ...move }));
+    const boardKey = createMoveHistoryKey(moves);
+    const sessionId = ResearchSessionState.startNewResearchSession(boardKey);
+    const request = { sessionId, boardKey, moves, reason, nbest: currentNBest || 5 };
+
+    researchOperationChain = researchOperationChain
+        .catch((error) => {
+            console.error('[Research] Previous operation failed:', error);
+        })
+        .then(() => runResearchSession(request));
+    return researchOperationChain;
+}
+
+async function runResearchSession({ sessionId, boardKey, moves, reason, nbest }) {
+    const isCurrent = () => isCurrentResearchRequest(sessionId, boardKey);
+    if (!isCurrent()) return false;
+
     if (engineRuntime.getIsStarting()) {
         await delay(50);
+        if (!isCurrent()) return false;
     }
 
     resetResearchBuffers();
     finishThinkDebug("research-restart");
 
-    const nbest = currentNBest || 5;
-
     const ready = await engineRuntime.ensureReady();
     if (!ready) {
         if (DEBUG_MODE) console.error(`[Research DEBUG #${sessionId}] engine ready timeout or generation mismatch`);
-        return;
+        return false;
     }
-    if (!isResearchMode || sessionId !== ResearchSessionState.getResearchSessionSeq()) {
+    if (!isCurrent()) {
         if (DEBUG_MODE) console.log(`[Research DEBUG #${sessionId}] stale session skipped`);
-        return;
+        return false;
     }
 
     if (!engineRuntime.getSupportsThreads() && engineRuntime.getIsIOS() && engineRuntime.getIsBusy()) {
         ResearchSessionState.setPendingIOSResearchReason(reason);
         if (DEBUG_MODE) console.log(`[Research DEBUG #${sessionId}] iOS single-thread engine is busy; queued latest research position until current search finishes.`);
-        return;
+        return false;
     }
 
-    const latestMoves = GameState.applyMoveHistory(GameState.getMoveHistory(), `research:${reason}`);
-    const latestBoardKey = createMoveHistoryKey(latestMoves);
-    ResearchSessionState.setCurrentResearchBoardKey(latestBoardKey);
     const prepared = await prepareResearchEngine({
         engineRuntime,
         sendToEngine,
         initializeResearchSession,
         delay,
         sessionId,
-        reason
+        reason,
+        isCurrent
     });
-    if (!prepared) return;
-    if (!isResearchMode || sessionId !== ResearchSessionState.getResearchSessionSeq()) {
+    if (!prepared) return false;
+    if (!isCurrent()) {
         if (DEBUG_MODE) console.log(`[Research DEBUG #${sessionId}] stale prepared session skipped`);
-        return;
+        return false;
     }
-    ResearchSessionState.setActiveResearchBoardKey(latestBoardKey);
+    ResearchSessionState.setActiveResearchBoardKey(boardKey);
 
     const researchTimeout = getResearchTimeout({
         supportsThreads: engineRuntime.getSupportsThreads(),
@@ -711,18 +754,19 @@ async function startResearchSession(reason = "manual") {
     logResearchBoardForEngine({
         sessionId,
         reason,
-        moves: latestMoves,
+        moves,
         toNotation
     });
-    startThinkDebug(`research:${reason}`, latestMoves.length, nbest, researchTimeout);
+    startThinkDebug(`research:${reason}`, moves.length, nbest, researchTimeout);
 
     sendResearchSearchCommand({
-        moves: latestMoves,
+        moves,
         nbest,
         researchTimeout,
         sendToEngine,
         engineRuntime
     });
+    return true;
 }
 
 // 棋譜解析の処理(一手分の解析、全ての手が終わるまで繰り返す)
@@ -813,6 +857,7 @@ function createGameSessionContext() {
         terminateByTimeout,
         finishGameAfterPlayerMoveIfNeeded,
         invalidateGameSearch,
+        getGameSearchSeq: () => gameSearchSeq,
         clearGameActionTimer,
         bumpGameActionSeq: () => { gameActionSeq++; },
         stopAnalysisSession,
@@ -1011,13 +1056,20 @@ window.backendAPI_research_sync = async function(history, nbest, threads, hashSi
     if (!isResearchMode) return;
 
     applyResearchSettings(nbest, threads, hashSize);
-    GameState.applyMoveHistory(history, "research_sync");
+    const normalizedMoves = GameState.applyMoveHistory(history, "research_sync");
+    ResearchSessionState.invalidateResearchPosition(createMoveHistoryKey(normalizedMoves));
 
     if (DEBUG_MODE) {
         console.log(`[Research] 盤面同期 (${history.length}手)。プロセスを維持して再解析します。`);
     }
 
     startResearchSession("sync");
+};
+
+window.backendAPI_research_invalidate = function(boardKey) {
+    if (!isResearchMode) return;
+    ResearchSessionState.invalidateResearchPosition(typeof boardKey === 'string' ? boardKey : "");
+    finishThinkDebug("research-position-invalidated");
 };
 
 // プレイヤー着手処理
@@ -1130,6 +1182,7 @@ window.backendAPI_finish_game = function() {
 
 // 研究モード切り替え
 window.backendAPI_toggle_research = function(enabled, nbest, threads, hashSize) {
+    invalidateGameSearch();
     isResearchMode = enabled;
     isGameRunning = false;
     isRapfiThinking = false;
@@ -1164,6 +1217,7 @@ window.backendAPI_research_click = function(move) {
         if (!GameState.applyMoveTransaction(x, y, color)) {
             return;
         }
+        ResearchSessionState.invalidateResearchPosition(GameState.getBoardKey());
         
         // --- Adaptive Debounce ---
         const now = performance.now();
@@ -1179,6 +1233,7 @@ window.backendAPI_research_undo = function() {
     if (!isResearchMode || GameState.getMoveHistory().length === 0) return;
     GameState.popLastMove();
     GameState.rebuildBoardFromHistory(); // 変更
+    ResearchSessionState.invalidateResearchPosition(GameState.getBoardKey());
     
     sendToRenderer('undo_result', { moveHistory: GameState.getMoveHistory() });
     
