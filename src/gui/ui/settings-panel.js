@@ -57,6 +57,7 @@ export function installSettingsMethods(proto) {
         this.updateTimerDisplayPosition(timerOnSide?.checked ?? false);
 
         if (shouldRedrawBoard) {
+            this.configureCanvasResolution();
             this.initBackground();
             this.drawBoard();
         }

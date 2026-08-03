@@ -14,7 +14,8 @@ export const BOARD_SIZE = 15;
     export const BLACK = 1; 
     export const WHITE = 2; 
     export const MARGIN = 30; 
-    export const CELL_SIZE = 34; 
+export const CELL_SIZE = 34;
+const LOGICAL_CANVAS_SIZE = 540;
 
     //盤面の描画、クリック処理、禁手判定、棋譜表記を管理
    export class RenjuEngine {
@@ -38,9 +39,7 @@ export const BOARD_SIZE = 15;
         this.startTouchY = 0;
 
         this.bgCanvas = document.createElement('canvas');
-        this.bgCanvas.width = this.canvas.width;
-        this.bgCanvas.height = this.canvas.height;
-        this.bgCtx = this.bgCanvas.getContext('2d'); // 透明度不要で高速化
+        this.configureCanvasResolution();
         this.initBackground(); // 背景を1回だけ描画して保存
 
         this.drawBoard();
@@ -109,11 +108,26 @@ export const BOARD_SIZE = 15;
         if (clientX === undefined || clientY === undefined) return { ix: -1, iy: -1 };
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
-        const xPos = (clientX - rect.left) * scaleX;
-        const yPos = (clientY - rect.top) * scaleY;
+        const xPos = (clientX - rect.left) * scaleX / this.renderScale;
+        const yPos = (clientY - rect.top) * scaleY / this.renderScale;
         const ix = Math.round((xPos - MARGIN) / CELL_SIZE);
         const iy = Math.round((yPos - MARGIN) / CELL_SIZE);
         return { ix, iy };
+    }
+
+    configureCanvasResolution() {
+        const displaySize = this.useLargeBoardText ? 590 : LOGICAL_CANVAS_SIZE;
+        const pixelSize = Math.round(displaySize * (window.devicePixelRatio || 1));
+        this.renderScale = pixelSize / LOGICAL_CANVAS_SIZE;
+
+        this.canvas.width = pixelSize;
+        this.canvas.height = pixelSize;
+        this.bgCanvas.width = pixelSize;
+        this.bgCanvas.height = pixelSize;
+        this.ctx = this.canvas.getContext('2d');
+        this.bgCtx = this.bgCanvas.getContext('2d');
+        this.ctx.setTransform(this.renderScale, 0, 0, this.renderScale, 0, 0);
+        this.bgCtx.setTransform(this.renderScale, 0, 0, this.renderScale, 0, 0);
     }
 
     handleBoardInput(ix, iy) {
@@ -139,7 +153,7 @@ export const BOARD_SIZE = 15;
         
         // 背景色
         ctx.fillStyle = this.boardColor || "#F2E2BF";
-        ctx.fillRect(0, 0, this.bgCanvas.width, this.bgCanvas.height);
+        ctx.fillRect(0, 0, LOGICAL_CANVAS_SIZE, LOGICAL_CANVAS_SIZE);
         
         if (this.showBoardCoordinates !== false) {
             ctx.fillStyle = "#000";
@@ -154,7 +168,7 @@ export const BOARD_SIZE = 15;
             const letters = "ABCDEFGHIJKLMNO";
             for(let i=0; i<BOARD_SIZE; i++) {
                 const x = MARGIN + i * CELL_SIZE;
-                ctx.fillText(letters[i], x, this.bgCanvas.height - MARGIN/2);
+                ctx.fillText(letters[i], x, LOGICAL_CANVAS_SIZE - MARGIN/2);
             }
         }
 
@@ -185,11 +199,15 @@ export const BOARD_SIZE = 15;
 
     createStoneImage(color) {
         const cvs = document.createElement('canvas');
-        const diameter = this.useLargeBoardText ? 34 : 30;
+        // The enlarged canvas already scales stones up; keep a visible gap between adjacent stones.
+        const diameter = this.useLargeBoardText ? 31 : 30;
         const radius = diameter / 2;
-        cvs.width = diameter;
-        cvs.height = diameter;
+        const pixelDiameter = Math.ceil(diameter * this.renderScale);
+        cvs.width = pixelDiameter;
+        cvs.height = pixelDiameter;
         const ctx = cvs.getContext('2d', { alpha: true });
+        ctx.scale(pixelDiameter / diameter, pixelDiameter / diameter);
+        cvs.logicalDiameter = diameter;
         
         ctx.beginPath();
         ctx.arc(radius, radius, radius, 0, Math.PI * 2);
@@ -217,25 +235,14 @@ export const BOARD_SIZE = 15;
 
     drawBoard() {
         // 1. キャッシュした背景画像を1発で描画（劇的に軽い）
-        this.ctx.drawImage(this.bgCanvas, 0, 0);
+        this.ctx.drawImage(this.bgCanvas, 0, 0, LOGICAL_CANVAS_SIZE, LOGICAL_CANVAS_SIZE);
 
         // 2. 石を描画
         this.moveHistory.forEach((move, index) => {
             this.drawStone(move.x, move.y, move.color, 1.0, index + 1);
         });
         
-        // 3. 最終手の赤い四角マーク
-        if(this.lastMove) {
-            this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 2;
-            const markerSize = this.useLargeBoardText ? 20 : 14;
-            this.ctx.strokeRect(
-                MARGIN + this.lastMove.x * CELL_SIZE - markerSize / 2,
-                MARGIN + this.lastMove.y * CELL_SIZE - markerSize / 2,
-                markerSize,
-                markerSize
-            );
-        }
-        
+        // 3. Latest move number is rendered in red by drawStone.
         // 4. 研究モード等のオーバーレイ
         if (this.isResearchMode) {
             this.drawResearchOverlays();
@@ -249,7 +256,7 @@ export const BOARD_SIZE = 15;
             const ctx = this.ctx;
             const K = 210; // 勝率計算用定数
             const useLargeText = this.useLargeBoardText === true;
-            const markerRadius = useLargeText ? 17 : 15;
+            const markerRadius = useLargeText ? 18 : 15;
 
             for (const key in this.researchCandidates) {
                 const data = this.researchCandidates[key];
@@ -378,13 +385,17 @@ export const BOARD_SIZE = 15;
         // キャッシュした石の画像を中心座標に合わせて貼り付ける
         const stoneImg = (color === BLACK) ? this.blackStoneImg : this.whiteStoneImg;
         if (stoneImg) {
-            this.ctx.drawImage(stoneImg, cx - stoneImg.width / 2, cy - stoneImg.height / 2);
+            const diameter = stoneImg.logicalDiameter || stoneImg.width;
+            this.ctx.drawImage(stoneImg, cx - diameter / 2, cy - diameter / 2, diameter, diameter);
         }
 
         // 手数（数字）の描画
-        if (this.showNumbers && number !== null) {
-            this.ctx.fillStyle = (color === BLACK) ? "white" : "black";
-            this.ctx.font = `bold ${this.useLargeBoardText ? 16 : 12}px Arial`;
+        const isLatestMove = number === this.moveHistory.length
+            && this.lastMove?.x === x
+            && this.lastMove?.y === y;
+        if (number !== null && (this.showNumbers || isLatestMove)) {
+            this.ctx.fillStyle = isLatestMove ? "red" : ((color === BLACK) ? "white" : "black");
+            this.ctx.font = `bold ${this.useLargeBoardText ? 18 : 12}px Arial`;
             this.ctx.textAlign = "center";
             this.ctx.textBaseline = "middle";
             this.ctx.fillText(number.toString(), cx, cy);
