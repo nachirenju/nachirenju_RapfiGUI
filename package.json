@@ -14,8 +14,8 @@
     "wasm-feature-detect": "^1.8.0"
   },
   "devDependencies": {
-    "electron": "^39.2.7",
-    "electron-builder": "^26.4.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3",
     "vite": "^8.0.13"
   },
   "build": {
